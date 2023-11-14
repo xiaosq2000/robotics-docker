@@ -2,7 +2,7 @@ version: "3.8"
 services:
   robotics-dev:
     env_file: ./.env
-    image: ros-${ROS_DISTRO}-${ROS_DISTRO_TAG}:latest
+    image: robotics-dev:latest
     container_name: robotics_dev
     build:
       context: .
