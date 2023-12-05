@@ -33,24 +33,8 @@ docker compose up -d
 docker exec -it robotics_dev bash
 ```
 
-## Customize
+## Tips for customization
 
-Here are the components that I use personally. 
-
-| Dependency | Version      |
-| :---:      | :---:        |
-| nvidia     |              |
-| ubuntu     | 22.04        |
-| ros2       | iron-desktop |
-| cmake      | 3.27.7       |
-| python3    | 3.12.0       |
-| opencv3    | 3.4.16       |
-| opencv4    | 4.8.0        |
-| eigen      | 3.4.0        |
-| ceres      | 2.2.0        |
-| neovim     | 0.9.4        |
-| tmux       | 3.3a         |
-
-- To modify version, edit `setup.bash`.
-- To add new dependencies, make sure to synchronize changes across all three files: `Dockerfile`, `docker-compose.yml`, and `setup.bash`. 
-
+- Do not modify `.env` directly, modifiy and run `setup.bash` instead.
+- If you don't want some dependencies, just leave the value (version) empty.
+- Make sure to synchronize changes across the three files: `Dockerfile`, `docker-compose.yml`, and `setup.bash`.

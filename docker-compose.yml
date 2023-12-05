@@ -9,35 +9,32 @@ services:
       network: host
       dockerfile: Dockerfile
       args:
+        COMPILE_JOBS: ${COMPILE_JOBS}
         http_proxy: ${http_proxy}
         https_proxy: ${https_proxy}
         HTTP_PROXY: ${HTTP_PROXY}
         HTTPS_PROXY: ${HTTPS_PROXY}
-        COMPILE_JOBS: ${COMPILE_JOBS}
         OS: ${OS}
-        ROS_DISTRO: ${ROS_DISTRO}
-        ROS_DISTRO_TAG: ${ROS_DISTRO_TAG}
         CMAKE_VERSION: ${CMAKE_VERSION}
         PYTHON3_VERSION: ${PYTHON3_VERSION}
         OPENCV3_VERSION: ${OPENCV3_VERSION}
         OPENCV4_VERSION: ${OPENCV4_VERSION}
         EIGEN_VERSION: ${EIGEN_VERSION}
         CERES_VERSION: ${CERES_VERSION}
-        NEOVIM_VERSION: ${NEOVIM_VERSION}
-        TMUX_VERSION: ${TMUX_VERSION}
+        ROS_DISTRO: ${ROS_DISTRO}
+        ROS_DISTRO_TAG: ${ROS_DISTRO_TAG}
+        GAZEBO_DISTRO: ${GAZEBO_DISTRO}
         USER: ${USER}
         UID: ${UID}
         GID: ${GID}
+        NEOVIM_VERSION: ${NEOVIM_VERSION}
+        TMUX_VERSION: ${TMUX_VERSION}
+        CARLA_VERSION: ${CARLA_VERSION}
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [ gpu ]
+      - SDL_VIDEODRIVER=x11
+    runtime: nvidia
     user: ${UID}:${GID}
     network_mode: host
     ipc: host
@@ -47,10 +44,8 @@ services:
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # nvim configuration
+      # personal configurations
       - ~/.config/nvim/:${HOME}/.config/nvim/:ro
-      # tmux configuration
       - ~/.tmux.conf:${HOME}/.tmux.conf:ro
-      # git configuration
       - ~/.gitconfig:${HOME}/.gitconfig:ro
     restart: always
