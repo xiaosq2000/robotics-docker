@@ -1,6 +1,11 @@
 # syntax=docker/dockerfile:1
-ARG OS=ubuntu:22.04
-FROM ${OS} AS common_base
+
+ARG OS 
+ARG ARCH 
+ARG UBUNTU_DISTRO
+ARG UBUNTU_RELEASE_DATE
+
+FROM --platform=${OS}/${ARCH} ubuntu:${UBUNTU_DISTRO}-${UBUNTU_RELEASE_DATE} AS common_base
 
 ARG http_proxy 
 ARG HTTP_PROXY 
@@ -11,294 +16,244 @@ ENV HTTP_PROXY ${http_proxy}
 ENV https_proxy ${http_proxy}
 ENV HTTPS_PROXY ${http_proxy}
 
-ARG COMPILE_JOBS=1
-ENV COMPILE_JOBS=${COMPILE_JOBS}
-
 ENV DEBIAN_FRONTEND noninteractive
 
-USER root
-# basics dependencies
-RUN apt-get update && \
-    apt-get install -qy --no-install-recommends \
-    # locale
-    locales \
-    # compile
-    build-essential \
-    # compress
-    zip unzip \
-    # network
-    wget curl net-tools \
-    # ssl verification
-    openssl libssl-dev gnupg2 dirmngr ca-certificates \
-    # editor
-    vim \
-    # teamwork
-    git doxygen \
-    # graphics
-    libcanberra-gtk-module \
-    # python3
-    python3-dev python3-pip python3-venv python3-setuptools python3-wheel \
-    # x11 client
-    libx11-dev libxt-dev libxpm-dev xauth \
-    # google c++ dev tools
-    libgoogle-glog-dev libgflags-dev \
-    # computation 
-    libatlas-base-dev libsuitesparse-dev \
-    # usb, uvc, v4l 
-    usbutils libv4l-dev v4l-utils \
-    && rm -rf /var/lib/apt/lists/*
-# set up locales
 ENV LC_ALL en_US.UTF-8 
 ENV LANG en_US.UTF-8  
 ENV LANGUAGE en_US
-RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen
+RUN apt-get update && \
+    apt-get install -qy --no-install-recommends \
+    # utilities for locale
+    locales \
+    # a handy CLI tool for superuser privilege, not recommended in Docker though.
+    sudo \
+    # utilities for management of software sources 
+    software-properties-common \
+    # networking
+    wget curl net-tools \
+    # utilities for SSL based verification
+    gnupg2 dirmngr ca-certificates \
+    # (de)compression utilities for 'zip' format
+    zip unzip \
+    # basic utilities for development
+    build-essential cmake \
+    # python3
+    python3-dev python3-pip python3-venv python3-setuptools python3-wheel \
+    # all you needed for x11 client
+    xauth \
+    # editor, version control system, documentation generator
+    vim git doxygen \
+    && rm -rf /var/lib/apt/lists/* \
+    # set locales
+    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen
 
-WORKDIR /usr/local/
-# build and install cmake (specified version)
+FROM common_base AS building_base
+WORKDIR /downloads
+ARG COMPILE_JOBS=1
+ENV COMPILE_JOBS=${COMPILE_JOBS}
+FROM building_base AS building_cmake
 ARG CMAKE_VERSION
-RUN if [ -z "${CMAKE_VERSION}" ] ; then :; else \
-    export CMAKE_SRC_URL=https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz && \
-    wget ${CMAKE_SRC_URL} && \
-    tar -xf cmake-${CMAKE_VERSION}.tar.gz && \
+COPY ./downloads/cmake-${CMAKE_VERSION}.tar.gz cmake-${CMAKE_VERSION}.tar.gz
+RUN apt-get update && \
+    apt-get install -qy --no-install-recommends \
+    # Why is SSL needed? cmake can download stuff :)
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/* && \
+    tar -zxf cmake-${CMAKE_VERSION}.tar.gz && \
     cd cmake-${CMAKE_VERSION} && \
     ./bootstrap -- -DCMAKE_BUILD_TYPE:STRING=Release && \
-    make -j ${COMPILE_JOBS} && \
-    make install && \
-    rm -rf ../cmake-${CMAKE_VERSION}.tar.gz ../cmake-${CMAKE_VERSION} \
-    ; fi
-# build and install python3 (specified version), 'altinstall' to prevent conflicts
-ARG PYTHON3_VERSION
-RUN if [ -z "${PYTHON3_VERSION}" ] ; then :; else \
-    export PYTHON3_SRC_URL=https://www.python.org/ftp/python/${PYTHON3_VERSION}/Python-${PYTHON3_VERSION}.tar.xz && \
-    wget ${PYTHON3_SRC_URL} && \
-    tar -xf Python-${PYTHON3_VERSION}.tar.xz && \
-    cd Python-${PYTHON3_VERSION} && \
-    ./configure --prefix=/usr --enable-shared --enable-optimizations && \
-    make -j ${COMPILE_JOBS} && \
-    make altinstall && \
-    rm -rf ../Python-${PYTHON3_VERSION} ../Python-${PYTHON3_VERSION}.tar.xz \
-    ; fi
-# build opencv3 (specified version), not installed to prevent conflicts
-ARG OPENCV3_VERSION
-RUN if [ -z "${OPENCV3_VERSION}" ] ; then :; else \
-    export OPENCV3_SRC_URL=https://github.com/opencv/opencv/archive/refs/tags/${OPENCV3_VERSION}.tar.gz && \
-    wget ${OPENCV3_SRC_URL} && \
-    tar -xf ${OPENCV3_VERSION}.tar.gz && \
-    cd opencv-${OPENCV3_VERSION} && \
+    make -j ${COMPILE_JOBS}
+FROM building_base AS building_opencv
+ARG OPENCV_VERSION
+COPY ./downloads/${OPENCV_VERSION}.tar.gz ${OPENCV_VERSION}.tar.gz
+RUN tar -xf ${OPENCV_VERSION}.tar.gz && \
+    cd opencv-${OPENCV_VERSION} && \
     cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build -j ${COMPILE_JOBS} && \
-    rm -rf ../${OPENCV3_VERSION}.tar.gz \
-    ; fi
-# build opencv4 (specified version), not installed to prevent conflicts
-ARG OPENCV4_VERSION
-RUN if [ -z "${OPENCV4_VERSION}" ] ; then :; else \
-    export OPENCV4_SRC_URL=https://github.com/opencv/opencv/archive/refs/tags/${OPENCV4_VERSION}.tar.gz && \
-    wget ${OPENCV4_SRC_URL} && \
-    tar -xf ${OPENCV4_VERSION}.tar.gz && \
-    cd opencv-${OPENCV4_VERSION} && \
-    cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build -j ${COMPILE_JOBS} && \
-    rm -rf ../${OPENCV4_VERSION}.tar.gz \
-    ; fi
-# build and install eigen
+    cmake --build build -j ${COMPILE_JOBS}
+FROM building_base AS building_eigen
 ARG EIGEN_VERSION
-RUN if [ -z "${EIGEN_VERSION}" ] ; then :; else \
-    export EIGEN_GIT_URL=https://gitlab.com/libeigen/eigen && \ 
-    git clone ${EIGEN_GIT_URL} && \
-    cd eigen && \
-    git checkout ${EIGEN_VERSION} && \
+COPY ./downloads/eigen-${EIGEN_VERSION}.tar.bz2 eigen-${EIGEN_VERSION}.tar.bz2
+RUN tar -jxf eigen-${EIGEN_VERSION}.tar.bz2 && \
+    cd eigen-${EIGEN_VERSION} && \
     cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build -j ${COMPILE_JOBS} && \
-    cmake --install build && \
-    rm -rf ../eigen \
-    ; fi
-# build and install ceres
+    cmake --build build -j ${COMPILE_JOBS}
+FROM building_eigen AS building_ceres
+ARG EIGEN_VERSION
+COPY --from=building_eigen /downloads/eigen-${EIGEN_VERSION}/ eigen-${EIGEN_VERSION}/
 ARG CERES_VERSION
-RUN if [ -z "${CERES_VERSION}" ] ; then :; else \
-    export CERES_GIT_URL=https://github.com/ceres-solver/ceres-solver && \
-    git clone ${CERES_GIT_URL} && \
-    cd ceres-solver && \
-    git checkout ${CERES_VERSION} && \
-    cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build -j ${COMPILE_JOBS} && \
-    cmake --install build && \
-    rm -rf ../ceres-solver \
-    ; fi
+COPY ./downloads/ceres-solver-${CERES_VERSION}.tar.gz ceres-solver-${CERES_VERSION}.tar.gz
+RUN apt-get update &&  apt-get install -qy --no-install-recommends \
+    libgoogle-glog-dev libgflags-dev \
+    libatlas-base-dev libsuitesparse-dev \
+    && rm -rf /var/lib/apt/lists/* && \
+    tar -zxf ceres-solver-${CERES_VERSION}.tar.gz && \
+    cd ceres-solver-${CERES_VERSION} && \
+    cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release -DEigen_DIR=eigen-${EIGEN_VERSION} && \
+    cmake --build build -j ${COMPILE_JOBS}
+FROM building_base AS building_tmux
+ARG TMUX_VERSION
+COPY ./downloads/tmux-${TMUX_VERSION}.tar.gz tmux-${TMUX_VERSION}.tar.gz
+RUN apt-get update && apt-get install -qy --no-install-recommends \
+    libevent-dev ncurses-dev build-essential bison pkg-config \
+    && rm -rf /var/lib/apt/lists/* && \
+    tar -zxf tmux-${TMUX_VERSION}.tar.gz && \
+    rm tmux-${TMUX_VERSION}.tar.gz && \
+    cd tmux-${TMUX_VERSION} && \
+    mkdir -p build && \
+    ./configure --prefix=/downloads/tmux-${TMUX_VERSION}/build && \
+    make -j ${COMPILE_JOBS} && make install
+FROM building_base AS building_python
+ARG PYTHON_VERSION 
+COPY ./downloads/Python-${PYTHON_VERSION}.tar.xz Python-${PYTHON_VERSION}.tar.xz
+RUN apt-get update && \
+    apt-get install -qy --no-install-recommends \
+    # for pip 
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/* && \
+    tar -xf Python-${PYTHON_VERSION}.tar.xz && \
+    cd Python-${PYTHON_VERSION} && \
+    ./configure --prefix=/usr --enable-shared --enable-optimizations && \
+    make -j ${COMPILE_JOBS}
+
 ################################################################################
-# download ROS2 via package manager
-ARG ROS_DISTRO
-ARG ROS_DISTRO_TAG=desktop
-RUN if [ -z "${ROS_DISTRO}" ] ; then :; else \
-    apt-get update && apt-get install -qy --no-install-recommends \
-    software-properties-common curl && \
-    add-apt-repository universe && \
+############################### the final stage ################################
+################################################################################
+FROM common_base AS dev
+# shell & terminal
+SHELL ["/bin/bash", "-c"]
+ENV TERM=xterm-256color
+ENV color_prompt=yes
+# non-root user
+ARG DOCKER_USER 
+ARG DOCKER_UID
+ARG DOCKER_GID 
+ARG DOCKER_HOME=/home/${DOCKER_USER}
+RUN groupadd -g ${DOCKER_GID} ${DOCKER_USER} && \
+    useradd -r -m -d ${DOCKER_HOME} -s /bin/bash -g ${DOCKER_GID} -u ${DOCKER_UID} -G sudo ${DOCKER_USER} && \
+    echo ${DOCKER_USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${DOCKER_USER} && \
+    chmod 0440 /etc/sudoers.d/${DOCKER_USER}
+WORKDIR ${DOCKER_HOME}
+# neovim
+ARG NEOVIM_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/nvim-linux64.tar.gz nvim-linux64.tar.gz
+RUN apt-get update && apt-get install -qy --no-install-recommends \
+    # for nvim-telescope better performance
+    ripgrep fd-find \
+    && rm -rf /var/lib/apt/lists/* && \
+    tar -zxf nvim-linux64.tar.gz && \
+    rm nvim-linux64.tar.gz
+ENV PATH=${DOCKER_HOME}/nvim-linux64/bin:${PATH}
+# tmux
+ARG TMUX_VERSION
+COPY --from=building_tmux --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/tmux-${TMUX_VERSION}/build/bin tmux-${TMUX_VERSION}/
+RUN apt-get update && apt-get install -qy --no-install-recommends \
+    libevent-core-2.1-7 libncurses6 \
+    && rm -rf /var/lib/apt/lists/*
+ENV PATH=${DOCKER_HOME}/tmux-${TMUX_VERSION}:${PATH}
+# ROS2
+ARG ROS2_DISTRO
+ARG ROS2_RELEASE_DATE
+ARG UBUNTU_DISTRO
+ARG ARCH 
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/ros2-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}-linux-${UBUNTU_DISTRO}-${ARCH}.tar.bz2 ros2-${ROS2_DISTRO}.tar.bz2
+RUN mkdir ros2-${ROS2_DISTRO} && \
+    tar -jxf ros2-${ROS2_DISTRO}.tar.bz2 -C ros2-${ROS2_DISTRO} && \
+    rm ros2-${ROS2_DISTRO}.tar.bz2 && \
     curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
     apt-get update && apt-get install -qy --no-install-recommends \
-    ros-dev-tools && \
-    apt-get update && apt-get upgrade -qy && \
-    apt-get update && apt-get install -qy --no-install-recommends \
-    ros-${ROS_DISTRO}-${ROS_DISTRO_TAG} \
-    && rm -rf /var/lib/apt/lists/* \
-    ; fi
-# download Gazebo via package manager
+    python3-rosdep \
+    ros-dev-tools \
+    && rm -rf /var/lib/apt/lists/*
+# 'rosdep' is designed for non-root users and dependent on 'sudo', lack of native Docker support.
+# A work-around solution, ref: https://robotics.stackexchange.com/questions/75642/how-to-run-rosdep-init-and-update-in-dockerfile
+USER ${DOCKER_USER}
+RUN sudo -E rosdep init && \
+    sudo apt-get update && \
+    rosdep update --rosdistro ${ROS2_DISTRO} && \
+    rosdep install --rosdistro ${ROS2_DISTRO} --from-paths ros2-${ROS2_DISTRO}/ros2-linux/share --ignore-src -y --skip-keys "\
+    cyclonedds \
+    fastcdr \
+    fastrtps \
+    rti-connext-dds-6.0.1 urdfdom_headers \
+    "
+USER root
+# Gazebo (package manager)
 ARG GAZEBO_DISTRO
-RUN if [ -z "${GAZEBO_DISTRO}" ] ; then :; else \
-    wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
+RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null && \
     apt-get update && apt-get install -qy --no-install-recommends \
-    ${GAZEBO_DISTRO} ros-${ROS_DISTRO}-ros-gz \
-    ; fi
-
-################################################################################
-########################## personal stuff from now on ##########################
-################################################################################
-
-################################################################################
-########################### user & shell & terminal ############################
-################################################################################
-FROM common_base AS user_base
-# user
-ARG UID 
-ARG GID 
-ARG USER 
-RUN groupadd -g ${GID} ${USER} && \
-    useradd -r -m -d /home/${USER} -s /bin/bash -g ${GID} -u ${UID} ${USER}
-USER ${USER}
-ARG HOME=/home/${USER}
-WORKDIR ${HOME}
-# shell
-SHELL ["/bin/bash", "-c"]
-# terminal
-ENV TERM=xterm-256color
-ENV color_prompt=yes
-
-################################################################################
-############################### carla-simulator ################################
-################################################################################
-
+    ${GAZEBO_DISTRO} ros-${ROS2_DISTRO}-ros-gz
+# CARLA simulator
 ARG CARLA_VERSION
-USER root
-RUN if [ -z "${CARLA_VERSION}" ] ; then :; else \
-    apt-get update && apt-get install -qy --no-install-recommends \
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} downloads/CARLA_${CARLA_VERSION}.tar.gz CARLA_${CARLA_VERSION}.tar.gz
+RUN apt-get update && apt-get install -qy --no-install-recommends \
     libsdl2-2.0 xserver-xorg libvulkan1 libomp5 \
+    # fix the harmless error: 'sh: 1: xdg-user-dir: not found'
     xdg-user-dirs \
-    && rm -rf /var/lib/apt/lists/* \
-    ; fi
-USER ${USER}
-# It's hard to achieve a conditional copy in dockerfile. 
-# This a temporal work-around to use a parent folder
-COPY --chown=${USER}:${USER} downloads/ downloads/
-RUN if [ -z "${CARLA_VERSION}" ] ; then :; else \
-    mkdir ~/carla && tar -C ~/carla -xf downloads/CARLA_${CARLA_VERSION}.tar.gz && \
-    rm -r downloads \
-    ; fi
-
-################################################################################
-##################################### nvim #####################################
-################################################################################
-# nvim dependencies
-USER root
-RUN apt-get update && \
-    apt-get install -qy --no-install-recommends \
-    # for nvim-telescope better performance
-    ripgrep fd-find \
-    # many nvim plugins and language servers are based on node-js and distributed via npm
-    nodejs npm \
+    && rm -rf /var/lib/apt/lists/* && \
+    mkdir CARLA_${CARLA_VERSION} && \
+    tar -zxf CARLA_${CARLA_VERSION}.tar.gz -C CARLA_${CARLA_VERSION} && \
+    rm CARLA_${CARLA_VERSION}.tar.gz
+# CMake
+ARG CMAKE_VERSION
+COPY --from=building_cmake --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/cmake-${CMAKE_VERSION}/ cmake-${CMAKE_VERSION}/
+# Eigen
+ARG EIGEN_VERSION
+COPY --from=building_eigen --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/eigen-${EIGEN_VERSION}/ eigen-${EIGEN_VERSION}/
+# Ceres solver
+ARG CERES_VERSION
+RUN apt-get update && apt-get install -qy --no-install-recommends \
+    libgoogle-glog0v5 libgflags2.2 \
+    libatlas3-base  libsuitesparse-dev \
     && rm -rf /var/lib/apt/lists/*
-# nvim
-USER ${USER}
-ARG NEOVIM_VERSION
-RUN wget -e http_proxy=${http_proxy} -e https_proxy=${https_proxy} https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz && \
-    tar -zxf nvim-linux64.tar.gz && \
-    rm nvim-linux64.tar.gz && \
-    mv nvim-linux64 ~/nvim
-ENV PATH=~/nvim/bin:${PATH}
-# nvim plugin manager
+COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/ceres-solver-${CERES_VERSION}/ ceres-solver-${CERES_VERSION}/
+# OpenCV
+ARG OPENCV_VERSION
+COPY --from=building_opencv --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/opencv-${OPENCV_VERSION}/ opencv-${OPENCV_VERSION}/
+RUN apt-get update && apt-get install -qy --no-install-recommends \
+    libcanberra-gtk-module \
+    && rm -rf /var/lib/apt/lists/*
+# Python (altinstall)
+ARG PYTHON_VERSION 
+COPY --from=building_python --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/Python-${PYTHON_VERSION}/ Python-${PYTHON_VERSION}/
+RUN cd Python-${PYTHON_VERSION}/ && \
+    make altinstall && \
+    rm -r ../Python-${PYTHON_VERSION}/
+
+USER ${DOCKER_USER}
+
+# nodejs via nvm
+ARG NVM_VERSION
+RUN git config --global http.proxy ${http_proxy} && git config --global https.proxy ${https_proxy} && \
+    wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh | bash && \
+    export NVM_DIR="$DOCKER_HOME/.nvm" && \
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" && \
+    nvm install --lts node && \
+    git config --global --unset http.proxy && git config --global --unset https.proxy
+# neovim plugin manager
 RUN git clone --config http.proxy=${http_proxy} --config https.proxy=${https_proxy} --depth 1 \
     https://github.com/wbthomason/packer.nvim \
-    ~/.local/share/nvim/site/pack/packer/start/packer.nvim && \
-    mkdir -p ${HOME}/.config/nvim
-# Pend for fetching plugins and mounting the configurations at runtime, 
-# since my setup is always WIP. i.e. only get packer.nvim (vim plugin manager) 
-# ready and mkdir $XDG_CONFIG_HOME/nvim
-
-################################################################################
-##################################### tmux #####################################
-################################################################################
-FROM user_base AS tmux_builder
-ARG USER 
-USER root 
-RUN http_proxy=${http_proxy} \
-    https_proxy=${https_proxy} \
-    HTTP_PROXY=${HTTP_PROXY} \
-    HTTPS_PROXY=${HTTPS_PROXY} \
-    apt-get update && \
-    apt-get install -qy --no-install-recommends \
-    # tmux build time dependencies
-    libevent-dev ncurses-dev build-essential bison pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-USER ${USER}
-# build tmux
-ARG TMUX_VERSION
-RUN wget -e http_proxy=${http_proxy} -e https_proxy=${http_proxy} https://github.com/tmux/tmux/releases/download/${TMUX_VERSION}/tmux-${TMUX_VERSION}.tar.gz && \
-    tar -zxf tmux-${TMUX_VERSION}.tar.gz && \
-    rm tmux-${TMUX_VERSION}.tar.gz && \
-    mv tmux-${TMUX_VERSION} tmux && \
-    cd tmux && \
-    mkdir build && \
-    ./configure prefix=~/tmux/build && \
-    make -j ${COMPILE_JOBS}
-
-FROM user_base
-ARG USER 
-USER root
-RUN http_proxy=${http_proxy} \
-    https_proxy=${https_proxy} \
-    HTTP_PROXY=${HTTP_PROXY} \
-    HTTPS_PROXY=${HTTPS_PROXY} \
-    apt-get update && \
-    apt-get install -qy --no-install-recommends \
-    # tmux runtime dependencies
-    libevent-core-2.1-7 libncurses6 \
-    && rm -rf /var/lib/apt/lists/*
-USER ${USER}
-ARG HOME=/home/${USER}
-ARG TMUX_VERSION
-COPY --from=tmux_builder ${HOME}/tmux/build ${HOME}/tmux/build
-ENV PATH=~/tmux/build/bin:${PATH}
-ENV MANPATH=~/tmux/build/share/man:${MANPATH}
+    ${DOCKER_HOME}/.local/share/nvim/site/pack/packer/start/packer.nvim
 # tmux plugin manager
 RUN git clone --config http.proxy=${http_proxy} --config https.proxy=${http_proxy} \
     https://github.com/tmux-plugins/tpm \
-    ~/.tmux/plugins/tpm
-
-################################################################################
-############################### python workspace ###############################
-################################################################################
-
-# # set up and configure a python-venv workspace
-# ENV PYTHON3_VENV_WORKSPACE ~/pyvenv_ws
-# RUN PYTHON3_VERSION_MAJOR=`echo ${PYTHON3_VERSION} | cut -d. -f1` && \
-#     PYTHON3_VERSION_MINOR=`echo ${PYTHON3_VERSION} | cut -d. -f2` && \
-#     python${PYTHON3_VERSION_MAJOR}.${PYTHON3_VERSION_MINOR} -m venv ${PYTHON3_VENV_WORKSPACE} && \
-#     cd ${PYTHON3_VENV_WORKSPACE} && \
-#     source bin/activate && \
-#     python3 -m pip install --upgrade --proxy ${http_proxy} \ 
-#     autopep8 \
-#     cpplint \
-#     numpy \
-#     pandas \
-#     matplotlib \
-#     pytransform3d \
-#     && \
-#     python3 -m pip install --proxy ${http_proxy} evo --upgrade --no-binary evo && \
-#     deactivate
-
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ${HOME}/.bashrc
-
+    ${DOCKER_HOME}/.tmux/plugins/tpm
+# Python virtual workspace
+ENV PYTHON_VENV_PATH=${DOCKER_HOME}/python_venv
+RUN PYTHON_VERSION_MAJOR=`echo ${PYTHON_VERSION} | cut -d. -f1` && \
+    PYTHON_VERSION_MINOR=`echo ${PYTHON_VERSION} | cut -d. -f2` && \
+    python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR} -m venv ${PYTHON_VENV_PATH} && \
+    source ${PYTHON_VENV_PATH}/bin/activate && \
+    python -m pip install --upgrade \ 
+    numpy pandas matplotlib \
+    pytransform3d evo \
+    carla \
+    && \
+    deactivate
+# usbutils libv4l-dev v4l-utils \
+ENV DEBIAN_FRONTEND=newt
 ENV http_proxy=
 ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
-ENV DEBIAN_FRONTEND=

@@ -3,39 +3,39 @@ services:
   robotics-dev:
     env_file: ./.env
     image: robotics-dev:latest
-    container_name: robotics_dev
+    container_name: robotics-dev
     build:
       context: .
       network: host
       dockerfile: Dockerfile
       args:
+        DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
+        OS: ${OS}
+        ARCH: ${ARCH}
+        UBUNTU_DISTRO: ${UBUNTU_DISTRO}
+        UBUNTU_RELEASE_DATE: ${UBUNTU_RELEASE_DATE}
         COMPILE_JOBS: ${COMPILE_JOBS}
+        ROS2_DISTRO: ${ROS2_DISTRO}
+        ROS2_RELEASE_DATE: ${ROS2_RELEASE_DATE}
+        PYTHON_VERSION: ${PYTHON_VERSION}
+        CMAKE_VERSION: ${CMAKE_VERSION}
+        OPENCV_VERSION: ${OPENCV_VERSION}
+        EIGEN_VERSION: ${EIGEN_VERSION}
+        CERES_VERSION: ${CERES_VERSION}
+        GAZEBO_DISTRO: ${GAZEBO_DISTRO}
+        CARLA_VERSION: ${CARLA_VERSION}
+        NEOVIM_VERSION: ${NEOVIM_VERSION}
+        TMUX_VERSION: ${TMUX_VERSION}
+        NVM_VERSION: ${NVM_VERSION}
         http_proxy: ${http_proxy}
         https_proxy: ${https_proxy}
         HTTP_PROXY: ${HTTP_PROXY}
         HTTPS_PROXY: ${HTTPS_PROXY}
-        OS: ${OS}
-        CMAKE_VERSION: ${CMAKE_VERSION}
-        PYTHON3_VERSION: ${PYTHON3_VERSION}
-        OPENCV3_VERSION: ${OPENCV3_VERSION}
-        OPENCV4_VERSION: ${OPENCV4_VERSION}
-        EIGEN_VERSION: ${EIGEN_VERSION}
-        CERES_VERSION: ${CERES_VERSION}
-        ROS_DISTRO: ${ROS_DISTRO}
-        ROS_DISTRO_TAG: ${ROS_DISTRO_TAG}
-        GAZEBO_DISTRO: ${GAZEBO_DISTRO}
-        USER: ${USER}
-        UID: ${UID}
-        GID: ${GID}
-        NEOVIM_VERSION: ${NEOVIM_VERSION}
-        TMUX_VERSION: ${TMUX_VERSION}
-        CARLA_VERSION: ${CARLA_VERSION}
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - SDL_VIDEODRIVER=x11
+        DOCKER_USER: ${DOCKER_USER}
+        DOCKER_UID: ${DOCKER_UID}
+        DOCKER_GID: ${DOCKER_GID}
+    user: ${DOCKER_UID}:${DOCKER_GID}
     runtime: nvidia
-    user: ${UID}:${GID}
     network_mode: host
     ipc: host
     privileged: true
@@ -45,7 +45,7 @@ services:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # personal configurations
-      - ~/.config/nvim/:${HOME}/.config/nvim/:ro
-      - ~/.tmux.conf:${HOME}/.tmux.conf:ro
-      - ~/.gitconfig:${HOME}/.gitconfig:ro
+      - ~/.config/nvim/:/home/${DOCKER_USER}/.config/nvim/:ro
+      - ~/.tmux.conf:/home/${DOCKER_USER}/.tmux.conf:ro
+      - ~/.gitconfig:/home/${DOCKER_USER}/.gitconfig:ro
     restart: always
