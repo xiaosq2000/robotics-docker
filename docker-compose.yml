@@ -1,12 +1,34 @@
 version: "3.8"
 services:
   robotics-dev:
-    env_file: ./.env
     image: robotics-dev:latest
     container_name: robotics-dev
+    env_file: ./.env
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    network_mode: ${NETWORK_MODE}
+    stdin_open: true
+    tty: true
+    ipc: host
+    privileged: true
+    restart: always
+    runtime: ${RUNTIME}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: ["gpu"]
+    volumes:
+      # x11 socket
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # personal configurations
+      - ~/.config/nvim/:/home/${DOCKER_USER}/.config/nvim/:ro
+      - ~/.tmux.conf:/home/${DOCKER_USER}/.tmux.conf:ro
+      - ~/.gitconfig:/home/${DOCKER_USER}/.gitconfig:ro
     build:
       context: .
-      network: host
+      network: ${NETWORK_MODE}
       dockerfile: Dockerfile
       args:
         DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
@@ -34,18 +56,3 @@ services:
         DOCKER_USER: ${DOCKER_USER}
         DOCKER_UID: ${DOCKER_UID}
         DOCKER_GID: ${DOCKER_GID}
-    user: ${DOCKER_UID}:${DOCKER_GID}
-    runtime: nvidia
-    network_mode: host
-    ipc: host
-    privileged: true
-    stdin_open: true
-    tty: true
-    volumes:
-      # x11 socket
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # personal configurations
-      - ~/.config/nvim/:/home/${DOCKER_USER}/.config/nvim/:ro
-      - ~/.tmux.conf:/home/${DOCKER_USER}/.tmux.conf:ro
-      - ~/.gitconfig:/home/${DOCKER_USER}/.gitconfig:ro
-    restart: always
