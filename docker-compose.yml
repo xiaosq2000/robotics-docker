@@ -1,7 +1,7 @@
 version: "3.8"
 services:
-  robotics-dev:
-    image: robotics-dev:latest
+  robotics:
+    image: robotics:dev
     container_name: robotics-dev
     env_file: ./.env
     user: ${DOCKER_UID}:${DOCKER_GID}
@@ -22,33 +22,28 @@ services:
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # personal configurations
-      - ~/.config/nvim/:/home/${DOCKER_USER}/.config/nvim/:ro
-      - ~/.tmux.conf:/home/${DOCKER_USER}/.tmux.conf:ro
-      - ~/.gitconfig:/home/${DOCKER_USER}/.gitconfig:ro
+      # datasets
+      - ~/data/:/home/${DOCKER_USER}/data:ro
     build:
       context: .
       network: ${NETWORK_MODE}
       dockerfile: Dockerfile
+      target: robotics
       args:
         DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
         OS: ${OS}
         ARCH: ${ARCH}
+        BASE_IMAGE: ${BASE_IMAGE}
         UBUNTU_DISTRO: ${UBUNTU_DISTRO}
-        UBUNTU_RELEASE_DATE: ${UBUNTU_RELEASE_DATE}
         COMPILE_JOBS: ${COMPILE_JOBS}
+        DEPENDENCIES_DIR: ${DEPENDENCIES_DIR}
         ROS2_DISTRO: ${ROS2_DISTRO}
         ROS2_RELEASE_DATE: ${ROS2_RELEASE_DATE}
-        PYTHON_VERSION: ${PYTHON_VERSION}
-        CMAKE_VERSION: ${CMAKE_VERSION}
+        RTI_CONNEXT_DDS_VERSION: ${RTI_CONNEXT_DDS_VERSION}
         OPENCV_VERSION: ${OPENCV_VERSION}
-        EIGEN_VERSION: ${EIGEN_VERSION}
+        OPENCV_CONTRIB_VERSION: ${OPENCV_CONTRIB_VERSION}
         CERES_VERSION: ${CERES_VERSION}
-        GAZEBO_DISTRO: ${GAZEBO_DISTRO}
-        CARLA_VERSION: ${CARLA_VERSION}
         NEOVIM_VERSION: ${NEOVIM_VERSION}
-        TMUX_VERSION: ${TMUX_VERSION}
-        NVM_VERSION: ${NVM_VERSION}
         http_proxy: ${http_proxy}
         https_proxy: ${https_proxy}
         HTTP_PROXY: ${HTTP_PROXY}

@@ -1,13 +1,14 @@
 # robotics in docker
 
-A dockerized development environment for roboticists.
+A dockerized development environment for robotics research and development.
 
 ## Quick Start
 
-### 0. Requirements & Prerequisites
+### 0. Prerequisites
 
-- Install [Docker Engine](https://docs.docker.com/engine/), [Docker Compose](https://docs.docker.com/compose/) and [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-- Basic familiarity or usage experience with Docker is sufficient.
+- [Docker Engine](https://docs.docker.com/engine/)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 ### 1. Setup
 
