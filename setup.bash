@@ -9,6 +9,7 @@ env_file=${script_dir}/.env && cat /dev/null > ${env_file}
 # >>>>>>>>>>>>>>>>>>>>>>>>>> Environment Variables >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
  
 buildtime_env=$(cat <<-END
+
 # >>> Under build.args >>> 
 DOCKER_BUILDKIT=1
 OS=linux
@@ -25,43 +26,53 @@ OPENCV_CONTRIB_VERSION=4.8.1
 CERES_VERSION=2.2.0
 NEOVIM_VERSION=0.9.4
 # <<< Under build.args <<< 
+
 END
 )
 proxy_env=$(cat <<-END
+
 BUILDTIME_NETWORK_MODE=host
 RUNTIME_NETWORK_MODE=bridge
 http_proxy=http://host.docker.internal:1080
 https_proxy=http://host.docker.internal:1080
 HTTP_PROXY=http://host.docker.internal:1080
 HTTPS_PROXY=http://host.docker.internal:1080
+
 # >>> Under build.args >>> 
 buildtime_http_proxy=http://127.0.0.1:1080
 buildtime_https_proxy=http://127.0.0.1:1080
 BUILDTIME_HTTP_PROXY=http://127.0.0.1:1080
 BUILDTIME_HTTPS_PROXY=http://127.0.0.1:1080
 # <<< Under build.args <<< 
+
 END
 )
 user_env=$(cat <<-END
+
 # >>> Under build.args >>> 
 DOCKER_USER=robotics
 DOCKER_UID=$(id -u)
 DOCKER_GID=$(id -g)
 # <<< Under build.args <<< 
+
 END
 )
 nvidia_runtime_env=$(cat <<-END
+
 RUNTIME=nvidia
 NVIDIA_VISIBLE_DEVICES=all
 NVIDIA_DRIVER_CAPABILITIES=all
 DISPLAY=${DISPLAY}
 SDL_VIDEODRIVER=x11
+
 END
 )
 runtime_env=$(cat <<-END
+
 RUNTIME=runc
 DISPLAY=${DISPLAY}
 SDL_VIDEODRIVER=x11
+
 END
 )
 
@@ -70,7 +81,7 @@ END
 TO_BUILD=true
 WITH_PROXY=true
 WITH_NVIDIA=true
-
+echo "# Managed by setup.bash" >> ${env_file}
 # Verify and save the categories of environment variables.
 if [ "${TO_BUILD}" = true ]; then
     echo "Saving build time environment varibles to ${env_file}"

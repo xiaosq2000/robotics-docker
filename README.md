@@ -31,11 +31,9 @@ docker compose up -d
 ### 4. Use
 
 ```bash
-docker exec -it robotics_dev bash
+docker exec -it robotics zsh
 ```
 
-## Tips for customization
+## Customization
 
-- Do not modify `.env` directly, modifiy and run `setup.bash` instead.
-- If you don't want some dependencies, just leave the value (version) empty.
-- Make sure to synchronize changes across the three files: `Dockerfile`, `docker-compose.yml`, and `setup.bash`.
+Make sure to synchronize changes across the three files: `Dockerfile`, `docker-compose.yml`, and `setup.bash`.
