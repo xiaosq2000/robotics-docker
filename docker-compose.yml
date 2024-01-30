@@ -2,14 +2,12 @@ version: "3.8"
 services:
   robotics:
     image: robotics:dev
-    container_name: robotics-dev
+    container_name: robotics
     env_file: ./.env
-    user: ${DOCKER_UID}:${DOCKER_GID}
-    network_mode: ${NETWORK_MODE}
     stdin_open: true
     tty: true
-    ipc: host
-    privileged: true
+    # ipc: host
+    # privileged: true
     restart: always
     runtime: ${RUNTIME}
     deploy:
@@ -17,16 +15,26 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ['0', '1', '2', '3', '4', '5', '6', '7']
               capabilities: ["gpu"]
+    network_mode: ${RUNTIME_NETWORK_MODE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "2222:22"
+    # user: ${DOCKER_UID}:${DOCKER_GID}
+    user: root
+    command: ["/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0"]
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # ssh public keys
+      - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
       # datasets
       - ~/data/:/home/${DOCKER_USER}/data:ro
     build:
       context: .
-      network: ${NETWORK_MODE}
+      network: ${BUILDTIME_NETWORK_MODE}
       dockerfile: Dockerfile
       target: robotics
       args:
@@ -44,10 +52,10 @@ services:
         OPENCV_CONTRIB_VERSION: ${OPENCV_CONTRIB_VERSION}
         CERES_VERSION: ${CERES_VERSION}
         NEOVIM_VERSION: ${NEOVIM_VERSION}
-        http_proxy: ${http_proxy}
-        https_proxy: ${https_proxy}
-        HTTP_PROXY: ${HTTP_PROXY}
-        HTTPS_PROXY: ${HTTPS_PROXY}
+        http_proxy: ${buildtime_http_proxy}
+        https_proxy: ${buildtime_https_proxy}
+        HTTP_PROXY: ${BUILDTIME_HTTP_PROXY}
+        HTTPS_PROXY: ${BUILDTIME_HTTPS_PROXY}
         DOCKER_USER: ${DOCKER_USER}
         DOCKER_UID: ${DOCKER_UID}
         DOCKER_GID: ${DOCKER_GID}

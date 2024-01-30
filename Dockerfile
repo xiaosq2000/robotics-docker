@@ -170,11 +170,14 @@ ENV TERM=xterm-256color
 
 RUN apt-get update && apt-get install -qy --no-install-recommends \
     curl wget \
+    openssh-server \
     tmux \
     zsh \
     # nvim-telescope performance
     ripgrep fd-find \
     && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
+    # for ssh server
+    mkdir -p /var/run/sshd && \
     # Install starship, a cross-shell prompt tool
     wget -qO- https://starship.rs/install.sh | sh -s -- --yes --arch x86_64
 
@@ -268,6 +271,8 @@ ENV http_proxy=
 ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
+RUN sed -i '/[Pp][Rr][Oo][Xx][Yy]/d' ~/.zshrc
+RUN sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config
 
 WORKDIR ${DOCKER_HOME}
 

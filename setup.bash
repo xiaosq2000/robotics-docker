@@ -9,14 +9,13 @@ env_file=${script_dir}/.env && cat /dev/null > ${env_file}
 # >>>>>>>>>>>>>>>>>>>>>>>>>> Environment Variables >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
  
 buildtime_env=$(cat <<-END
-NETWORK_MODE=host
 # >>> Under build.args >>> 
 DOCKER_BUILDKIT=1
 OS=linux
 ARCH=amd64
 BASE_IMAGE=ubuntu:22.04
 UBUNTU_DISTRO=jammy
-COMPILE_JOBS=8
+COMPILE_JOBS=32
 DEPENDENCIES_DIR=/usr/local
 ROS2_DISTRO=humble
 ROS2_RELEASE_DATE=20240129
@@ -29,11 +28,17 @@ NEOVIM_VERSION=0.9.4
 END
 )
 proxy_env=$(cat <<-END
+BUILDTIME_NETWORK_MODE=host
+RUNTIME_NETWORK_MODE=bridge
+http_proxy=http://host.docker.internal:1080
+https_proxy=http://host.docker.internal:1080
+HTTP_PROXY=http://host.docker.internal:1080
+HTTPS_PROXY=http://host.docker.internal:1080
 # >>> Under build.args >>> 
-http_proxy=http://127.0.0.1:1080
-https_proxy=http://127.0.0.1:1080
-HTTP_PROXY=http://127.0.0.1:1080
-HTTPS_PROXY=http://127.0.0.1:1080
+buildtime_http_proxy=http://127.0.0.1:1080
+buildtime_https_proxy=http://127.0.0.1:1080
+BUILDTIME_HTTP_PROXY=http://127.0.0.1:1080
+BUILDTIME_HTTPS_PROXY=http://127.0.0.1:1080
 # <<< Under build.args <<< 
 END
 )
