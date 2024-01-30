@@ -24,7 +24,7 @@ services:
       - "2222:22"
     # user: ${DOCKER_UID}:${DOCKER_GID}
     user: root
-    command: ["/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0"]
+    command: ["/usr/sbin/sshd", "-D"]
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
