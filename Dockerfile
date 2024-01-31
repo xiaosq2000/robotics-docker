@@ -55,9 +55,9 @@ RUN apt-get update && \
     libpng-dev libjpeg-dev libtiff-dev libopenjp2-7-dev \
     # ffmpeg
     libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev libavutil-dev libpostproc-dev libswscale-dev \
-    # usb peripherals & uvc cameras
-    # kernel headers, here for v4l
+    # kernel headers, here for v4l for opencv
     linux-headers-generic \
+    # usb peripherals & uvc cameras
     usbutils libv4l-dev v4l-utils \
     # python3
     python3-dev python3-pip python3-venv python3-setuptools python3-wheel \
@@ -176,10 +176,12 @@ RUN apt-get update && apt-get install -qy --no-install-recommends \
     # nvim-telescope performance
     ripgrep fd-find \
     && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-    # for ssh server
-    mkdir -p /var/run/sshd && \
     # Install starship, a cross-shell prompt tool
     wget -qO- https://starship.rs/install.sh | sh -s -- --yes --arch x86_64
+
+# Set up ssh server
+RUN mkdir -p /var/run/sshd && \
+    sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config
 
 USER ${DOCKER_USER}
 
@@ -189,6 +191,7 @@ ADD --chown=${DOCKER_USER}:${DOCKER_USER} https://github.com/neovim/neovim/relea
 RUN export PREFIX="${DOCKER_HOME}/.local" && \
     cd ${PREFIX} && \
     tar -xf nvim-linux64.tar.gz && cd nvim-linux64 && \
+    # A simple manual installation 
     install() { mkdir -p ${PREFIX}/$1/ && cp -r $1/* ${PREFIX}/$1/; } && \
     install bin && \
     install lib && \
@@ -238,11 +241,7 @@ RUN \
     echo 'eval "$(pyenv init -)"' >> ~/.zshrc && \
     cd ~/.local/miniconda3/bin && \
     ./conda init zsh && \
-    ./conda config --set auto_activate_base false && \
-    # Set up conda bash completion, Ref: 
-    ./conda install -c conda-forge conda-bash-completion && \
-    echo 'export CONDA_ROOT="$HOME/.local/miniconda3"' >> ~/.bashrc && \
-    echo 'source $CONDA_ROOT/etc/profile.d/bash_completion.sh' >> ~/.bashrc
+    ./conda config --set auto_activate_base false
 
 # Utilize rosdep for installing missing ROS dependencies. Be cautious! 
 # `rosdep' is designed for non-root users and dependent on a system package manager, i.e., `sudo' and `apt' here.
@@ -272,7 +271,6 @@ ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
 RUN sed -i '/[Pp][Rr][Oo][Xx][Yy]/d' ~/.zshrc
-RUN sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config
 
 WORKDIR ${DOCKER_HOME}
 

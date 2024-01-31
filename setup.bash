@@ -10,7 +10,7 @@ env_file=${script_dir}/.env && cat /dev/null > ${env_file}
  
 buildtime_env=$(cat <<-END
 
-# >>> Under build.args >>> 
+# >>> as 'service.build.args' in docker-compose.yml >>> 
 DOCKER_BUILDKIT=1
 OS=linux
 ARCH=amd64
@@ -25,35 +25,46 @@ OPENCV_VERSION=4.8.0
 OPENCV_CONTRIB_VERSION=4.8.1
 CERES_VERSION=2.2.0
 NEOVIM_VERSION=0.9.4
-# <<< Under build.args <<< 
+# <<< as 'service.build.args' in docker-compose.yml <<< 
 
 END
 )
-proxy_env=$(cat <<-END
+buildtime_proxy_env=$(cat <<-END
 
 BUILDTIME_NETWORK_MODE=host
+# >>> as 'service.build.args' in docker-compose.yml >>> 
+buildtime_http_proxy=http://127.0.0.1:1080
+buildtime_https_proxy=http://127.0.0.1:1080
+BUILDTIME_HTTP_PROXY=http://127.0.0.1:1080
+BUILDTIME_HTTPS_PROXY=http://127.0.0.1:1080
+# <<< as 'service.build.args' in docker-compose.yml <<< 
+
+END
+)
+runtime_proxy_env=$(cat <<-END
+
 RUNTIME_NETWORK_MODE=bridge
 http_proxy=http://host.docker.internal:1080
 https_proxy=http://host.docker.internal:1080
 HTTP_PROXY=http://host.docker.internal:1080
 HTTPS_PROXY=http://host.docker.internal:1080
 
-# >>> Under build.args >>> 
-buildtime_http_proxy=http://127.0.0.1:1080
-buildtime_https_proxy=http://127.0.0.1:1080
-BUILDTIME_HTTP_PROXY=http://127.0.0.1:1080
-BUILDTIME_HTTPS_PROXY=http://127.0.0.1:1080
-# <<< Under build.args <<< 
-
 END
 )
 user_env=$(cat <<-END
 
-# >>> Under build.args >>> 
+# >>> as 'service.build.args' in docker-compose.yml >>> 
 DOCKER_USER=robotics
 DOCKER_UID=$(id -u)
 DOCKER_GID=$(id -g)
-# <<< Under build.args <<< 
+# <<< as 'service.build.args' in docker-compose.yml <<< 
+
+END
+)
+runtime_env=$(cat <<-END
+
+DISPLAY=${DISPLAY}
+SDL_VIDEODRIVER=x11
 
 END
 )
@@ -67,50 +78,51 @@ SDL_VIDEODRIVER=x11
 
 END
 )
-runtime_env=$(cat <<-END
-
-RUNTIME=runc
-DISPLAY=${DISPLAY}
-SDL_VIDEODRIVER=x11
-
-END
-)
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<< Environment Variables <<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 TO_BUILD=true
-WITH_PROXY=true
-WITH_NVIDIA=true
-echo "# Managed by setup.bash" >> ${env_file}
+BUILD_WITH_PROXY=true
+RUN_WITH_PROXY=true
+
+echo "
+################################################################################
+############################ Environment Variables #############################
+################################################################################
+" >> ${env_file}
+echo "# The file is managed by 'setup.bash'." >> ${env_file}
+
 # Verify and save the categories of environment variables.
 if [ "${TO_BUILD}" = true ]; then
-    echo "Saving build time environment varibles to ${env_file}"
     echo "${buildtime_env}" >> ${env_file}
 else
     echo -e "Warning: TO_BUILD=false\n\tMake sure the Docker image is ready."
 fi
-if [ "${WITH_PROXY}" = true ]; then
-    echo "Saving proxy environment varibles to ${env_file}"
-    echo "${proxy_env}" >> ${env_file}
+if [ "${BUILD_WITH_PROXY}" = true ]; then
+    echo "${buildtime_proxy_env}" >> ${env_file}
 else
-    echo -e "Warning: WITH_PROXY=false\n\tChinese GFW may corrupt networking in the building stage."
+    echo -e "Warning: BUILD_WITH_PROXY=false\n\tChinese GFW may corrupt networking in the building stage."
+fi
+if [ "${RUN_WITH_PROXY}" = true ]; then
+    echo "${runtime_proxy_env}" >> ${env_file}
+else
+    echo -e "Warning: RUN_WITH_PROXY=false\n\tChinese GFW may corrupt networking."
 fi
 echo "${user_env}" >> ${env_file}
-if [ "${WITH_NVIDIA}" = true ]; then
-    echo "Saving NVIDIA runtime environment varibles to ${env_file}"
-    echo "${nvidia_runtime_env}" >> ${env_file}
-else
-    echo "Warning: WITH_NVIDIA=false"
-    echo "${runtime_env}" >> ${env_file}
-fi
-echo
+echo "${runtime_env}" >> ${env_file}
+echo "${nvidia_runtime_env}" >> ${env_file}
+echo "
+################################################################################
+################################################################################
+################################################################################
+" >> ${env_file}
+cat ${env_file}
 
 # Load varibles from ${env_file}. Ref: https://stackoverflow.com/a/30969768
 set -o allexport && source ${env_file} && set +o allexport
 
 # Download
 if [ "${TO_BUILD}" = false ]; then
-    echo "Done."
     exit 0
 fi
 
@@ -139,7 +151,7 @@ download_all() {
     done
 }
 
-append_to_download_list NEOVIM_VERSION "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" ""
+# append_to_download_list NEOVIM_VERSION "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" ""
 append_to_download_list CERES_VERSION "http://ceres-solver.org/ceres-solver-${CERES_VERSION}.tar.gz" ""
 append_to_download_list OPENCV_VERSION "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" "opencv-${OPENCV_VERSION}.tar.gz"
 append_to_download_list OPENCV_CONTRIB_VERSION "https://github.com/opencv/opencv_contrib/archive/refs/tags/${OPENCV_CONTRIB_VERSION}.tar.gz" "opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz"
@@ -148,8 +160,7 @@ append_to_download_list ROS2_DISTRO "https://github.com/ros2/ros2/releases/downl
 
 # Give some feedback via CLI.
 if [ ${#wget_urls[@]} = 0 ]; then
-    echo -e "No download tasks. Exiting now."
-    echo "Done."
+    echo -e "No download tasks. Done."
     exit;
 else
     echo -e "${#wget_urls[@]} files to download:"
@@ -157,4 +168,3 @@ else
 fi
 
 download_all;
-echo "Done."
