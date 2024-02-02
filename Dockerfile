@@ -22,7 +22,7 @@ ENV LANGUAGE en_US
 ARG DEPENDENCIES_DIR=/usr/local
 ENV DEPENDENCIES_DIR=${DEPENDENCIES_DIR}
 WORKDIR ${DEPENDENCIES_DIR}
-# 
+
 RUN apt-get update && \
     apt-get install -qy --no-install-recommends \
     # a handy tool for superuser privilege
@@ -45,6 +45,8 @@ RUN apt-get update && \
     vim git doxygen man-db bash-completion \
     # x11 client 
     xauth xclip x11-apps \
+    # ssh server 
+    openssh-server \
     # desktop-bus
     dbus dbus-x11 \
     # text-based user interfaces 
@@ -111,6 +113,7 @@ RUN cd opencv-${OPENCV_VERSION} && \
     -DWITH_OPENMP=ON \
     -DWITH_GTK=ON \
     && cmake --build build -j ${COMPILE_JOBS}
+
 # Build Ceres-solver.
 FROM building_base AS building_ceres
 ARG CERES_VERSION
@@ -129,6 +132,7 @@ RUN cd ceres-solver-${CERES_VERSION} && \
 #     mkdir -p build && \
 #     ./configure --prefix=${DEPENDENCIES_DIR}/tmux-${TMUX_VERSION}/build && \
 #     make -j ${COMPILE_JOBS} && make install
+
 FROM development_base as robotics
 # Set up a non-root user within the sudo group.
 ARG DOCKER_USER 
@@ -139,6 +143,7 @@ RUN groupadd -g ${DOCKER_GID} ${DOCKER_USER} && \
     useradd -r -m -d ${DOCKER_HOME} -s /bin/bash -g ${DOCKER_GID} -u ${DOCKER_UID} -G sudo ${DOCKER_USER} && \
     echo ${DOCKER_USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${DOCKER_USER} && \
     chmod 0440 /etc/sudoers.d/${DOCKER_USER}
+
 # Copy ROS2 (fat achieve) and install Gazebo (APT).
 ARG ROS2_DISTRO
 ARG ROS2_RELEASE_DATE
@@ -166,82 +171,24 @@ COPY --from=building_opencv --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES
 # Shell: zsh (oh-my-zsh); starship
 # Editor: neovim (packer, mason, nodejs)
 
-ENV TERM=xterm-256color
+USER ${DOCKER_USER}
+WORKDIR ${DOCKER_HOME}
 
-RUN apt-get update && apt-get install -qy --no-install-recommends \
-    curl wget \
-    openssh-server \
-    tmux \
-    zsh \
+SHELL ["/bin/bash", "-c"]
+
+RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    wget curl \
+    tmux zsh openssh-server \
     # nvim-telescope performance
     ripgrep fd-find \
     && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
     # Install starship, a cross-shell prompt tool
-    wget -qO- https://starship.rs/install.sh | sh -s -- --yes --arch x86_64
+    wget -qO- https://starship.rs/install.sh | sudo sh -s -- --yes --arch x86_64
 
 # Set up ssh server
-RUN mkdir -p /var/run/sshd && \
-    sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config
-
-USER ${DOCKER_USER}
-
-# Neovim
-ARG NEOVIM_VERSION
-ADD --chown=${DOCKER_USER}:${DOCKER_USER} https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz ${DOCKER_HOME}/.local/nvim-linux64.tar.gz
-RUN export PREFIX="${DOCKER_HOME}/.local" && \
-    cd ${PREFIX} && \
-    tar -xf nvim-linux64.tar.gz && cd nvim-linux64 && \
-    # A simple manual installation 
-    install() { mkdir -p ${PREFIX}/$1/ && cp -r $1/* ${PREFIX}/$1/; } && \
-    install bin && \
-    install lib && \
-    install man/man1 && \
-    install share/applications && \
-    install share/icons && \
-    install share/locale && \
-    install share/nvim && \
-    cd .. && rm -r nvim-linux64.tar.gz nvim-linux64
-
-# Managers and plugins
-RUN \
-    # Install oh-my-zsh
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
-    # Install zsh plugins
-    git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
-    git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
-    # Install packer.nvim
-    git clone --depth 1 https://github.com/wbthomason/packer.nvim ~/.local/share/nvim/site/pack/packer/start/packer.nvim && \
-    # Install tpm
-    git clone --depth 1 https://github.com/tmux-plugins/tpm ~/.local/share/tmux/plugins/tpm && \
-    # Install nvm, without modification of shell profiles
-    export NVM_DIR=~/.config/nvm && mkdir -p ${NVM_DIR} && \
-    PROFILE=/dev/null bash -c 'wget -qO- "https://github.com/nvm-sh/nvm/raw/master/install.sh" | bash' && \
-    # Load nvm and install the latest lts nodejs
-    . "${NVM_DIR}/nvm.sh" && nvm install --lts node
-
-# Dotfiles
-RUN cd ~ && \
-    git init --initial-branch=main && \
-    git remote add origin https://github.com/xiaosq2000/dotfiles && \
-    git fetch --all && \
-    git reset --hard origin/main
-
-# Python
-RUN \
-    # Download the latest pyenv (python version and venv manager)
-    curl https://pyenv.run | bash && \
-    # Download the latest miniconda
-    mkdir -p ~/.local/miniconda3 && \
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/.local/miniconda.sh && \
-    bash ~/.local/miniconda.sh -b -u -p ~/.local/miniconda3 && \
-    rm -rf ~/.local/miniconda.sh && \
-    # Set up conda and pyenv, without conflicts, Ref: https://stackoverflow.com/a/58045893/11393911
-    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc && \
-    echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc && \
-    echo 'eval "$(pyenv init -)"' >> ~/.zshrc && \
-    cd ~/.local/miniconda3/bin && \
-    ./conda init zsh && \
-    ./conda config --set auto_activate_base false
+RUN sudo mkdir -p /var/run/sshd && \
+    sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config && \
+    sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
 # Utilize rosdep for installing missing ROS dependencies. Be cautious! 
 # `rosdep' is designed for non-root users and dependent on a system package manager, i.e., `sudo' and `apt' here.
@@ -249,7 +196,6 @@ RUN \
 # It's just a quick-and-dirty solution.
 # Ref: https://robotics.stackexchange.com/questions/75642/how-to-run-rosdep-init-and-update-in-dockerfile
 
-SHELL ["/bin/bash", "-c"]
 ARG RTI_CONNEXT_DDS_VERSION
 RUN sudo apt-get update && \
     source ${DEPENDENCIES_DIR}/ros2-linux/setup.bash && \
@@ -264,15 +210,74 @@ RUN sudo apt-get update && \
     rti-connext-dds-${RTI_CONNEXT_DDS_VERSION} \
     "
 
+# Neovim
+ARG NEOVIM_VERSION
+RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" -O nvim-linux64.tar.gz && \
+    tar -xf nvim-linux64.tar.gz && \
+    export SOURCE_DIR=${PWD}/nvim-linux64 && export DEST_DIR=${HOME}/.local && \
+    (cd ${SOURCE_DIR} && find . -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \;) && \
+    rm -r nvim-linux64.tar.gz nvim-linux64
+
+# Lazygit (newest version)
+RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') && \
+    curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
+    tar xf lazygit.tar.gz lazygit && \
+    install -Dm 755 lazygit ~/.local/bin && \
+    rm lazygit.tar.gz lazygit
+
+# Managers and plugins
+RUN \
+    # Install oh-my-zsh
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
+    # Install zsh plugins
+    git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
+    git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
+    git clone --depth 1 https://github.com/conda-incubator/conda-zsh-completion ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/conda-zsh-completion && \
+    # Install packer.nvim
+    git clone --depth 1 https://github.com/wbthomason/packer.nvim ~/.local/share/nvim/site/pack/packer/start/packer.nvim && \
+    # Install tpm
+    git clone --depth 1 https://github.com/tmux-plugins/tpm ~/.local/share/tmux/plugins/tpm && \
+    # Install nvm, without modification of shell profiles
+    export NVM_DIR=~/.config/nvm && mkdir -p ${NVM_DIR} && \
+    PROFILE=/dev/null bash -c 'wget -qO- "https://github.com/nvm-sh/nvm/raw/master/install.sh" | bash' && \
+    # Load nvm and install the latest lts nodejs
+    . "${NVM_DIR}/nvm.sh" && nvm install --lts node
+
+# Dotfiles
+RUN cd ~ && \
+    git init --initial-branch=main && \
+    git checkout -b docker && \
+    git remote add origin https://github.com/xiaosq2000/dotfiles && \
+    git fetch --all && \
+    git reset --hard origin/docker
+
+ENV TERM=xterm-256color
+SHELL ["/usr/bin/zsh", "-ic"]
+
+# 
+# # Python
+# RUN \
+#     # Download the latest pyenv (python version and venv manager)
+#     curl https://pyenv.run | bash && \
+#     # Download the latest miniconda
+#     mkdir -p ~/.local/miniconda3 && \
+#     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/.local/miniconda.sh && \
+#     bash ~/.local/miniconda.sh -b -u -p ~/.local/miniconda3 && \
+#     rm -rf ~/.local/miniconda.sh && \
+#     # Set up conda and pyenv, without conflicts, Ref: https://stackoverflow.com/a/58045893/11393911
+#     echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc && \
+#     echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc && \
+#     echo 'eval "$(pyenv init -)"' >> ~/.zshrc && \
+#     cd ~/.local/miniconda3/bin && \
+#     ./conda init zsh && \
+#     ./conda config --set auto_activate_base false
+
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt
 ENV http_proxy=
 ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
-RUN sed -i '/[Pp][Rr][Oo][Xx][Yy]/d' ~/.zshrc
-
-WORKDIR ${DOCKER_HOME}
 
 # # Build and install a Python via pyenv.
 # ARG PYTHON_VERSION

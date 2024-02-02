@@ -1,8 +1,8 @@
 version: "3.8"
 services:
   robotics:
-    image: robotics:dev
-    container_name: robotics
+    image: shuqixiao:dev
+    container_name: shuqixiao_dev
     env_file: ./.env
     stdin_open: true
     tty: true
@@ -22,16 +22,17 @@ services:
       - "host.docker.internal:host-gateway"
     ports:
       - "2222:22"
-    # user: ${DOCKER_UID}:${DOCKER_GID}
-    user: root
-    command: ["/usr/sbin/sshd", "-D"]
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    command: ["/usr/bin/sudo", "/usr/sbin/sshd", "-D"]
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # ssh public keys
       - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
-      # datasets
-      - ~/data/:/home/${DOCKER_USER}/data:ro
+      # data
+      - /mnt/dev-ssd-8T/shuqixiao/:/home/${DOCKER_USER}/data:ro
+      # code
+      - ~/code/:/home/${DOCKER_USER}/code:rw
     build:
       context: .
       network: ${BUILDTIME_NETWORK_MODE}
