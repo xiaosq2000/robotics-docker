@@ -37,3 +37,9 @@ docker exec -it robotics zsh
 ## Customization
 
 Make sure to synchronize changes across the three files: `Dockerfile`, `docker-compose.yml`, and `setup.bash`.
+
+## Todo
+
+1. A manifest
+2. Comments on some tricks
+3. Add branches for local and remote usage
