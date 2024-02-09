@@ -18,7 +18,6 @@ services:
               capabilities: ["gpu"]
     ports:
       - "2222:22"
-    user: ${DOCKER_UID}:${DOCKER_GID}
     command: ["/usr/bin/sudo", "/usr/sbin/sshd", "-D"]
     volumes:
       # x11 socket
