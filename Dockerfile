@@ -74,7 +74,7 @@ RUN apt-get update && \
     # sql
     libsqlite3-dev \
     # Clear
-    && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
+    && rm -rf /var/lib/apt/lists/* && \
     # Set locales
     sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen
 
@@ -121,17 +121,6 @@ ADD ./downloads/ceres-solver-${CERES_VERSION}.tar.gz .
 RUN cd ceres-solver-${CERES_VERSION} && \
     cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
     cmake --build build -j ${COMPILE_JOBS}
-# # Build TMUX.
-# FROM building_base AS building_tmux
-# ARG TMUX_VERSION
-# ADD ./downloads/tmux-${TMUX_VERSION}.tar.gz .
-# RUN apt-get update && apt-get install -qy --no-install-recommends \
-#     libevent-dev ncurses-dev bison \
-#     && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-#     cd tmux-${TMUX_VERSION} && \
-#     mkdir -p build && \
-#     ./configure --prefix=${DEPENDENCIES_DIR}/tmux-${TMUX_VERSION}/build && \
-#     make -j ${COMPILE_JOBS} && make install
 
 FROM development_base as robotics
 # Set up a non-root user within the sudo group.
@@ -156,7 +145,8 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o 
     python3-rosdep \
     ros-dev-tools \
     ros-${ROS2_DISTRO}-gazebo-ros \
-    && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/*
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy Ceres solver binaries.
 ARG CERES_VERSION
 COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES_DIR}/ceres-solver-${CERES_VERSION} ceres-solver-${CERES_VERSION}
@@ -178,12 +168,10 @@ SHELL ["/bin/bash", "-c"]
 
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     wget curl \
-    tmux zsh openssh-server \
+    zsh openssh-server \
     # nvim-telescope performance
     ripgrep fd-find \
-    && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-    # Install starship, a cross-shell prompt tool
-    wget -qO- https://starship.rs/install.sh | sudo sh -s -- --yes --arch x86_64
+    && sudo rm -rf /var/lib/apt/lists/*
 
 # Set up ssh server
 RUN sudo mkdir -p /var/run/sshd && \
@@ -211,12 +199,25 @@ RUN sudo apt-get update && \
     "
 
 # Neovim
-ARG NEOVIM_VERSION
+ARG NEOVIM_VERSION=0.9.4
 RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" -O nvim-linux64.tar.gz && \
     tar -xf nvim-linux64.tar.gz && \
     export SOURCE_DIR=${PWD}/nvim-linux64 && export DEST_DIR=${HOME}/.local && \
     (cd ${SOURCE_DIR} && find . -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \;) && \
     rm -r nvim-linux64.tar.gz nvim-linux64
+
+# Tmux
+ARG TMUX_GIT_HASH=ea7136fb838a2831d38e11ca94094cea61a01e3a
+RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake \
+    && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
+    git clone --depth 1 "https://github.com/tmux/tmux" && cd tmux && \
+    git checkout ${TMUX_GIT_HASH} && \
+    sh autogen.sh && \
+    ./configure --prefix=${DOCKER_HOME}/.local && \
+    make -j ${COMPILE_JOBS} && \
+    make install && \
+    rm -rf ../tmux
 
 # Lazygit (newest version)
 RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') && \
@@ -227,6 +228,8 @@ RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygi
 
 # Managers and plugins
 RUN \
+    # Install starship, a cross-shell prompt tool
+    wget -qO- https://starship.rs/install.sh | sudo sh -s -- --yes --arch x86_64 && \
     # Install oh-my-zsh
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
     # Install zsh plugins
@@ -251,10 +254,33 @@ RUN cd ~ && \
     git fetch --all && \
     git reset --hard origin/docker
 
+# Python
+RUN \
+    # Download the latest pyenv (python version and venv manager)
+    curl https://pyenv.run | bash && \
+    # Download the latest miniconda
+    mkdir -p ~/.local/miniconda3 && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/.local/miniconda.sh && \
+    bash ~/.local/miniconda.sh -b -u -p ~/.local/miniconda3 && \
+    rm -rf ~/.local/miniconda.sh && \
+    # Set up conda and pyenv, without conflicts, Ref: https://stackoverflow.com/a/58045893/11393911
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc && \
+    echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc && \
+    echo 'eval "$(pyenv init -)"' >> ~/.zshrc && \
+    cd ~/.local/miniconda3/bin && \
+    ./conda init zsh && \
+    ./conda config --set auto_activate_base false
+
 ENV TERM=xterm-256color
 SHELL ["/usr/bin/zsh", "-ic"]
 
-# 
+# Clear environment variables exclusively for building to prevent pollution.
+ENV DEBIAN_FRONTEND=newt
+ENV http_proxy=
+ENV HTTP_PROXY=
+ENV https_proxy=
+ENV HTTPS_PROXY=
+
 # # Python
 # RUN \
 #     # Download the latest pyenv (python version and venv manager)
@@ -271,13 +297,6 @@ SHELL ["/usr/bin/zsh", "-ic"]
 #     cd ~/.local/miniconda3/bin && \
 #     ./conda init zsh && \
 #     ./conda config --set auto_activate_base false
-
-# Clear environment variables exclusively for building to prevent pollution.
-ENV DEBIAN_FRONTEND=newt
-ENV http_proxy=
-ENV HTTP_PROXY=
-ENV https_proxy=
-ENV HTTPS_PROXY=
 
 # # Build and install a Python via pyenv.
 # ARG PYTHON_VERSION
@@ -303,6 +322,6 @@ ENV HTTPS_PROXY=
 #     libsdl2-2.0 xserver-xorg libvulkan1 libomp5 \
 #     # Fix the seemingly harmless error, ``sh: 1: xdg-user-dir: not found''
 #     xdg-user-dirs \
-#     && rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
+#     && rm -rf /var/lib/apt/lists/* && \
 # ARG CARLA_VERSION
 # ADD --chown=${DOCKER_USER}:${DOCKER_USER} downloads/CARLA_${CARLA_VERSION}.tar.gz ${DEPENDENCIES_DIR}/CARLA_${CARLA_VERSION}

@@ -1,38 +1,28 @@
 version: "3.8"
 services:
   robotics:
-    image: shuqixiao:dev
-    container_name: shuqixiao_dev
+    image: robotics:dev
+    container_name: robotics
     env_file: ./.env
-    stdin_open: true
-    tty: true
-    # ipc: host
-    # privileged: true
-    restart: always
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    network_mode: ${RUNTIME_NETWORK_MODE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     runtime: ${RUNTIME}
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0', '1', '2', '3', '4', '5', '6', '7']
+              device_ids: ['0']
               capabilities: ["gpu"]
-    network_mode: ${RUNTIME_NETWORK_MODE}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    ports:
-      - "2222:22"
-    user: ${DOCKER_UID}:${DOCKER_GID}
-    command: ["/usr/bin/sudo", "/usr/sbin/sshd", "-D"]
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # ssh public keys
-      - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
       # data
-      - /mnt/dev-ssd-8T/shuqixiao/:/home/${DOCKER_USER}/data:ro
+      - ~/dev/data:/home/${DOCKER_USER}/data:ro
       # code
-      - ~/code/:/home/${DOCKER_USER}/code:rw
+      - ~/dev/projects/:/home/${DOCKER_USER}/projects/:rw
     build:
       context: .
       network: ${BUILDTIME_NETWORK_MODE}
@@ -60,3 +50,8 @@ services:
         DOCKER_USER: ${DOCKER_USER}
         DOCKER_UID: ${DOCKER_UID}
         DOCKER_GID: ${DOCKER_GID}
+    stdin_open: true
+    tty: true
+    # ipc: host
+    # privileged: true
+    restart: always
