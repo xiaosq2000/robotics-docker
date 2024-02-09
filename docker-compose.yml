@@ -4,11 +4,10 @@ services:
     image: shuqixiao:dev
     container_name: shuqixiao_dev
     env_file: ./.env
-    stdin_open: true
-    tty: true
-    # ipc: host
-    # privileged: true
-    restart: always
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    network_mode: ${RUNTIME_NETWORK_MODE}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     runtime: ${RUNTIME}
     deploy:
       resources:
@@ -17,9 +16,6 @@ services:
             - driver: nvidia
               device_ids: ['0', '1', '2', '3', '4', '5', '6', '7']
               capabilities: ["gpu"]
-    network_mode: ${RUNTIME_NETWORK_MODE}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     ports:
       - "2222:22"
     user: ${DOCKER_UID}:${DOCKER_GID}
@@ -60,3 +56,8 @@ services:
         DOCKER_USER: ${DOCKER_USER}
         DOCKER_UID: ${DOCKER_UID}
         DOCKER_GID: ${DOCKER_GID}
+    stdin_open: true
+    tty: true
+    # ipc: host
+    # privileged: true
+    restart: always
