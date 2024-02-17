@@ -207,7 +207,7 @@ RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/
     rm -r nvim-linux64.tar.gz nvim-linux64
 
 # Tmux
-ARG TMUX_GIT_HASH=ea7136fb838a2831d38e11ca94094cea61a01e3a
+ARG TMUX_GIT_HASH=ea7136f
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake \
     && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
@@ -247,12 +247,13 @@ RUN \
     . "${NVM_DIR}/nvm.sh" && nvm install --lts node
 
 # Dotfiles
+ARG DOTFILES_GIT_HASH
 RUN cd ~ && \
     git init --initial-branch=main && \
     git checkout -b docker && \
     git remote add origin https://github.com/xiaosq2000/dotfiles && \
     git fetch --all && \
-    git reset --hard origin/docker
+    git reset --hard ${DOTFILES_GIT_HASH}
 
 # Python
 RUN \
@@ -271,8 +272,14 @@ RUN \
     ./conda init zsh && \
     ./conda config --set auto_activate_base false
 
-ENV TERM=xterm-256color
 SHELL ["/usr/bin/zsh", "-ic"]
+
+RUN conda create -y -n torch python=3.11 && \
+    conda activate torch && \
+    conda install -y gxx==11.4.0 cudatoolkit==11.7 cudatoolkit-dev==11.7 -c conda-forge && \
+    conda install -y pytorch==2.1.2 torchvision==0.16.2 -c pytorch
+
+ENV TERM=xterm-256color
 
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt

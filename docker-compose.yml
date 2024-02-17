@@ -48,6 +48,8 @@ services:
         OPENCV_CONTRIB_VERSION: ${OPENCV_CONTRIB_VERSION}
         CERES_VERSION: ${CERES_VERSION}
         NEOVIM_VERSION: ${NEOVIM_VERSION}
+        TMUX_GIT_HASH: ${TMUX_GIT_HASH}
+        DOTFILES_GIT_HASH: ${DOTFILES_GIT_HASH}
         http_proxy: ${buildtime_http_proxy}
         https_proxy: ${buildtime_https_proxy}
         HTTP_PROXY: ${BUILDTIME_HTTP_PROXY}
