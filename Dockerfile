@@ -207,7 +207,7 @@ RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/
     rm -r nvim-linux64.tar.gz nvim-linux64
 
 # Tmux
-ARG TMUX_GIT_HASH=ea7136f
+ARG TMUX_GIT_HASH
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake \
     && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
