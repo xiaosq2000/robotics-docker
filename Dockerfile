@@ -199,7 +199,7 @@ RUN sudo apt-get update && \
     "
 
 # Neovim
-ARG NEOVIM_VERSION=0.9.4
+ARG NEOVIM_VERSION
 RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" -O nvim-linux64.tar.gz && \
     tar -xf nvim-linux64.tar.gz && \
     export SOURCE_DIR=${PWD}/nvim-linux64 && export DEST_DIR=${HOME}/.local && \
@@ -207,11 +207,11 @@ RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/
     rm -r nvim-linux64.tar.gz nvim-linux64
 
 # Tmux
-ARG TMUX_GIT_HASH=ea7136f
+ARG TMUX_GIT_HASH
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake \
     && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-    git clone --depth 1 "https://github.com/tmux/tmux" && cd tmux && \
+    git clone "https://github.com/tmux/tmux" && cd tmux && \
     git checkout ${TMUX_GIT_HASH} && \
     sh autogen.sh && \
     ./configure --prefix=${DOCKER_HOME}/.local && \
@@ -274,8 +274,8 @@ RUN \
 
 SHELL ["/usr/bin/zsh", "-ic"]
 
-RUN conda create -y -n torch python=3.11 && \
-    conda activate torch && \
+RUN conda create -y -n pytorch python=3.11 && \
+    conda activate pytorch && \
     conda install -y gxx==11.4.0 cudatoolkit==11.7 cudatoolkit-dev==11.7 -c conda-forge && \
     conda install -y pytorch==2.1.2 torchvision==0.16.2 -c pytorch
 
