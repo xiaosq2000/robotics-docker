@@ -157,9 +157,6 @@ COPY --from=building_opencv --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES
 ################################################################################
 ####################### Personal Development Environment #######################
 ################################################################################
-# Terminal: tmux (tpm)
-# Shell: zsh (oh-my-zsh); starship
-# Editor: neovim (packer, mason, nodejs)
 
 USER ${DOCKER_USER}
 WORKDIR ${DOCKER_HOME}
@@ -229,6 +226,9 @@ RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygi
 # Managers and plugins
 RUN \
     # Install starship, a cross-shell prompt tool
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    musl-tools \
+    && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
     wget -qO- https://starship.rs/install.sh | sudo sh -s -- --yes --arch x86_64 && \
     # Install oh-my-zsh
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
@@ -236,8 +236,6 @@ RUN \
     git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
     git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
     git clone --depth 1 https://github.com/conda-incubator/conda-zsh-completion ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/conda-zsh-completion && \
-    # Install packer.nvim
-    git clone --depth 1 https://github.com/wbthomason/packer.nvim ~/.local/share/nvim/site/pack/packer/start/packer.nvim && \
     # Install tpm
     git clone --depth 1 https://github.com/tmux-plugins/tpm ~/.local/share/tmux/plugins/tpm && \
     # Install nvm, without modification of shell profiles
