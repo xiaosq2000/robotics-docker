@@ -1,5 +1,67 @@
 version: "3.8"
 services:
+  splatam:
+    image: robotics:dev
+    container_name: splatam
+    env_file: ./.env
+    environment:
+      - http_proxy="http://127.0.0.1:1080"
+      - https_proxy="http://127.0.0.1:1080"
+      - HTTP_PROXY="http://127.0.0.1:1080"
+      - HTTPS_PROXY="http://127.0.0.1:1080"
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    network_mode: host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    runtime: ${RUNTIME}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: ["gpu"]
+    volumes:
+      # x11 socket
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # data
+      - ~/dev/data:/home/${DOCKER_USER}/data:ro
+      # code
+      - ~/dev/projects/:/home/${DOCKER_USER}/projects/:rw
+    build:
+      context: .
+      network: ${BUILDTIME_NETWORK_MODE}
+      dockerfile: Dockerfile
+      target: robotics
+      args:
+        DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
+        OS: ${OS}
+        ARCH: ${ARCH}
+        BASE_IMAGE: ${BASE_IMAGE}
+        UBUNTU_DISTRO: ${UBUNTU_DISTRO}
+        COMPILE_JOBS: ${COMPILE_JOBS}
+        DEPENDENCIES_DIR: ${DEPENDENCIES_DIR}
+        ROS2_DISTRO: ${ROS2_DISTRO}
+        ROS2_RELEASE_DATE: ${ROS2_RELEASE_DATE}
+        RTI_CONNEXT_DDS_VERSION: ${RTI_CONNEXT_DDS_VERSION}
+        OPENCV_VERSION: ${OPENCV_VERSION}
+        OPENCV_CONTRIB_VERSION: ${OPENCV_CONTRIB_VERSION}
+        CERES_VERSION: ${CERES_VERSION}
+        NEOVIM_VERSION: ${NEOVIM_VERSION}
+        TMUX_GIT_HASH: ${TMUX_GIT_HASH}
+        DOTFILES_GIT_HASH: ${DOTFILES_GIT_HASH}
+        http_proxy: ${buildtime_http_proxy}
+        https_proxy: ${buildtime_https_proxy}
+        HTTP_PROXY: ${BUILDTIME_HTTP_PROXY}
+        HTTPS_PROXY: ${BUILDTIME_HTTPS_PROXY}
+        DOCKER_USER: ${DOCKER_USER}
+        DOCKER_UID: ${DOCKER_UID}
+        DOCKER_GID: ${DOCKER_GID}
+    stdin_open: true
+    tty: true
+    # ipc: host
+    # privileged: true
+    restart: always
   robotics:
     image: robotics:dev
     container_name: robotics

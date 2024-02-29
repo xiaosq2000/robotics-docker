@@ -231,7 +231,7 @@ RUN \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     musl-tools \
     && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-    wget -qO- https://starship.rs/install.sh | sh -s -- --yes -b ~/.local && \
+    wget -qO- https://starship.rs/install.sh | sh -s -- --yes -b ~/.local --arch x86_64 && \
     # Install oh-my-zsh
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
     # Install zsh plugins
