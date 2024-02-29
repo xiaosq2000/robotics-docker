@@ -163,9 +163,11 @@ WORKDIR ${DOCKER_HOME}
 
 SHELL ["/bin/bash", "-c"]
 
+# TODO: Manually build and install everything without sudo privilege  
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     wget curl \
-    zsh openssh-server \
+    zsh direnv \
+    openssh-server \
     # nvim-telescope performance
     ripgrep fd-find \
     && sudo rm -rf /var/lib/apt/lists/*
@@ -229,7 +231,7 @@ RUN \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     musl-tools \
     && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-    wget -qO- https://starship.rs/install.sh | sudo sh -s -- --yes --arch x86_64 && \
+    wget -qO- https://starship.rs/install.sh | sh -s -- --yes -b ~/.local && \
     # Install oh-my-zsh
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
     # Install zsh plugins
@@ -248,7 +250,6 @@ RUN \
 ARG DOTFILES_GIT_HASH
 RUN cd ~ && \
     git init --initial-branch=main && \
-    git checkout -b docker && \
     git remote add origin https://github.com/xiaosq2000/dotfiles && \
     git fetch --all && \
     git reset --hard ${DOTFILES_GIT_HASH}
@@ -272,10 +273,10 @@ RUN \
 
 SHELL ["/usr/bin/zsh", "-ic"]
 
-RUN conda create -y -n pytorch python=3.11 && \
-    conda activate pytorch && \
-    conda install -y gxx==11.4.0 cudatoolkit==11.7 cudatoolkit-dev==11.7 -c conda-forge && \
-    conda install -y pytorch==2.1.2 torchvision==0.16.2 -c pytorch
+# RUN conda create -y -n pytorch python=3.11 && \
+#     conda activate pytorch && \
+#     conda install -y gxx==11.4.0 cudatoolkit==11.7 cudatoolkit-dev==11.7 -c conda-forge && \
+#     conda install -y pytorch==2.1.2 torchvision==0.16.2 -c pytorch
 
 ENV TERM=xterm-256color
 
