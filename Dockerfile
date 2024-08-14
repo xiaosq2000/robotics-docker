@@ -82,45 +82,45 @@ FROM development_base AS building_base
 ARG COMPILE_JOBS=1
 ENV COMPILE_JOBS=${COMPILE_JOBS}
 
-# Build OpenCV.
-FROM building_base AS building_opencv
-ARG OPENCV_VERSION
-ADD ./downloads/opencv-${OPENCV_VERSION}.tar.gz .
-ARG OPENCV_CONTRIB_VERSION
-ADD ./downloads/opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz .
-RUN cd opencv-${OPENCV_VERSION} && \
-    cmake . -Bbuild \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${OPENCV_CONTRIB_VERSION}/modules \
-    -DBUILD_SHARED_LIBS=ON \
-    -DENABLE_PIC=ON \
-    -DOPENCV_GENERATE_PKGCONFIG=ON \
-    -DBUILD_TESTS=OFF \
-    -DBUILD_PERF_TESTS=OFF \
-    -DBUILD_EXAMPLES=OFF \
-    -DBUILD_opencv_apps=OFF \
-    # CUDA has issues with LTO support 
-    # Ref: https://forums.developer.nvidia.com/t/link-time-optimization-with-cuda-on-linux-flto/55530/6
-    -DENABLE_LTO=OFF \
-    -DOPENCV_IPP_GAUSSIAN_BLUR=ON \
-    -DOPENCV_IPP_MEAN=ON \
-    -DOPENCV_IPP_MINMAX=ON \
-    -DOPENCV_IPP_SUM=ON \
-    -DWITH_CUDA=ON \
-    -DWITH_V4L=ON \
-    -DWITH_FFMPEG=ON \
-    -DWITH_TBB=ON \
-    -DWITH_OPENMP=ON \
-    -DWITH_GTK=ON \
-    && cmake --build build -j ${COMPILE_JOBS}
+# # Build OpenCV.
+# FROM building_base AS building_opencv
+# ARG OPENCV_VERSION
+# ADD ./downloads/opencv-${OPENCV_VERSION}.tar.gz .
+# ARG OPENCV_CONTRIB_VERSION
+# ADD ./downloads/opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz .
+# RUN cd opencv-${OPENCV_VERSION} && \
+#     cmake . -Bbuild \
+#     -DCMAKE_BUILD_TYPE=Release \
+#     -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${OPENCV_CONTRIB_VERSION}/modules \
+#     -DBUILD_SHARED_LIBS=ON \
+#     -DENABLE_PIC=ON \
+#     -DOPENCV_GENERATE_PKGCONFIG=ON \
+#     -DBUILD_TESTS=OFF \
+#     -DBUILD_PERF_TESTS=OFF \
+#     -DBUILD_EXAMPLES=OFF \
+#     -DBUILD_opencv_apps=OFF \
+#     # CUDA has issues with LTO support 
+#     # Ref: https://forums.developer.nvidia.com/t/link-time-optimization-with-cuda-on-linux-flto/55530/6
+#     -DENABLE_LTO=OFF \
+#     -DOPENCV_IPP_GAUSSIAN_BLUR=ON \
+#     -DOPENCV_IPP_MEAN=ON \
+#     -DOPENCV_IPP_MINMAX=ON \
+#     -DOPENCV_IPP_SUM=ON \
+#     -DWITH_CUDA=ON \
+#     -DWITH_V4L=ON \
+#     -DWITH_FFMPEG=ON \
+#     -DWITH_TBB=ON \
+#     -DWITH_OPENMP=ON \
+#     -DWITH_GTK=ON \
+#     && cmake --build build -j ${COMPILE_JOBS}
 
-# Build Ceres-solver.
-FROM building_base AS building_ceres
-ARG CERES_VERSION
-ADD ./downloads/ceres-solver-${CERES_VERSION}.tar.gz .
-RUN cd ceres-solver-${CERES_VERSION} && \
-    cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
-    cmake --build build -j ${COMPILE_JOBS}
+# # Build Ceres-solver.
+# FROM building_base AS building_ceres
+# ARG CERES_VERSION
+# ADD ./downloads/ceres-solver-${CERES_VERSION}.tar.gz .
+# RUN cd ceres-solver-${CERES_VERSION} && \
+#     cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
+#     cmake --build build -j ${COMPILE_JOBS}
 
 FROM development_base as robotics
 # Set up a non-root user within the sudo group.
@@ -133,26 +133,26 @@ RUN groupadd -g ${DOCKER_GID} ${DOCKER_USER} && \
     echo ${DOCKER_USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${DOCKER_USER} && \
     chmod 0440 /etc/sudoers.d/${DOCKER_USER}
 
-# Copy ROS2 (fat achieve) and install Gazebo (APT).
-ARG ROS2_DISTRO
-ARG ROS2_RELEASE_DATE
-ARG UBUNTU_DISTRO
-ARG ARCH 
-ADD --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/ros2-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}-linux-${UBUNTU_DISTRO}-${ARCH}.tar.bz2 .
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
-    apt-get update && apt-get install -qy --no-install-recommends \
-    python3-rosdep \
-    ros-dev-tools \
-    ros-${ROS2_DISTRO}-gazebo-ros \
-    && rm -rf /var/lib/apt/lists/*
+# # Copy ROS2 (fat achieve) and install Gazebo (APT).
+# ARG ROS2_DISTRO
+# ARG ROS2_RELEASE_DATE
+# ARG UBUNTU_DISTRO
+# ARG ARCH 
+# ADD --chown=${DOCKER_USER}:${DOCKER_USER} /downloads/ros2-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}-linux-${UBUNTU_DISTRO}-${ARCH}.tar.bz2 .
+# RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+#     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
+#     apt-get update && apt-get install -qy --no-install-recommends \
+#     python3-rosdep \
+#     ros-dev-tools \
+#     ros-${ROS2_DISTRO}-gazebo-ros \
+#     && rm -rf /var/lib/apt/lists/*
 
-# Copy Ceres solver binaries.
-ARG CERES_VERSION
-COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES_DIR}/ceres-solver-${CERES_VERSION} ceres-solver-${CERES_VERSION}
-# Copy OpenCV binaries.
-ARG OPENCV_VERSION
-COPY --from=building_opencv --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES_DIR}/opencv-${OPENCV_VERSION} opencv-${OPENCV_VERSION}
+# # Copy Ceres solver binaries.
+# ARG CERES_VERSION
+# COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES_DIR}/ceres-solver-${CERES_VERSION} ceres-solver-${CERES_VERSION}
+# # Copy OpenCV binaries.
+# ARG OPENCV_VERSION
+# COPY --from=building_opencv --chown=${DOCKER_USER}:${DOCKER_USER} ${DEPENDENCIES_DIR}/opencv-${OPENCV_VERSION} opencv-${OPENCV_VERSION}
 
 ################################################################################
 ####################### Personal Development Environment #######################
@@ -166,37 +166,61 @@ WORKDIR ${DOCKER_HOME}
 
 SHELL ["/bin/bash", "-c"]
 
+ENV XDG_DATA_HOME=${DOCKER_HOME}/.local/share
+ENV XDG_CONFIG_HOME=${DOCKER_HOME}/.config
+ENV XDG_STATE_HOME=${DOCKER_HOME}/.local/state
+ENV XDG_CACHE_HOME=${DOCKER_HOME}/.cache
+ENV XDG_PREFIX_HOME=${DOCKER_HOME}/.local
+
+# TODO: Manually build and install everything without sudo privilege
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    lsb-release \
     wget curl \
-    zsh openssh-server \
-    # nvim-telescope performance
+    zsh direnv \
+    python3-venv python3-pip \
+    openssh-server \
     ripgrep fd-find \
     && sudo rm -rf /var/lib/apt/lists/*
+
+ARG ROS_DISTRO
+RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' && \
+    curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add - && \
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    ros-${ROS_DISTRO}-desktop-full \
+    python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential \
+    && sudo rm -rf /var/lib/apt/lists/* \
+    sudo rosdep init
+# ref: https://answers.ros.org/question/284683/rosdep-update-error-in-kinetic/
+RUN if [ -z "${http_proxy}" ]; then unset http_proxy && unset https_proxy && unset HTTP_PROXY && unset HTTPS_PROXY; fi && \
+    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    sudo rosdep init && \
+    sudo apt update && \
+    rosdep update
 
 # Set up ssh server
 RUN sudo mkdir -p /var/run/sshd && \
     sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config && \
     sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
-# Utilize rosdep for installing missing ROS dependencies. Be cautious! 
-# `rosdep' is designed for non-root users and dependent on a system package manager, i.e., `sudo' and `apt' here.
-# However, sudo is not recommended in Docker for many reasons, and a normal routine of `rosdep' fails here.
-# It's just a quick-and-dirty solution.
-# Ref: https://robotics.stackexchange.com/questions/75642/how-to-run-rosdep-init-and-update-in-dockerfile
-
-ARG RTI_CONNEXT_DDS_VERSION
-RUN sudo apt-get update && \
-    source ${DEPENDENCIES_DIR}/ros2-linux/setup.bash && \
-    sudo -E rosdep init && \
-    rosdep update --rosdistro ${ROS2_DISTRO} && \
-    # `RTI_NC_LICENSE_ACCEPTED=yes' to escape from interactive interface. 
-    RTI_NC_LICENSE_ACCEPTED=yes rosdep install --from-paths ${DEPENDENCIES_DIR}/ros2-linux/share --ignore-src -y --skip-keys "\
-    cyclonedds \
-    fastcdr \
-    fastrtps \
-    urdfdom_headers \
-    rti-connext-dds-${RTI_CONNEXT_DDS_VERSION} \
-    "
+# # Utilize rosdep for installing missing ROS dependencies. Be cautious! 
+# # `rosdep' is designed for non-root users and dependent on a system package manager, i.e., `sudo' and `apt' here.
+# # However, sudo is not recommended in Docker for many reasons, and a normal routine of `rosdep' fails here.
+# # It's just a quick-and-dirty solution.
+# # Ref: https://robotics.stackexchange.com/questions/75642/how-to-run-rosdep-init-and-update-in-dockerfile
+# 
+# ARG RTI_CONNEXT_DDS_VERSION
+# RUN sudo apt-get update && \
+#     source ${DEPENDENCIES_DIR}/ros2-linux/setup.bash && \
+#     sudo -E rosdep init && \
+#     rosdep update --rosdistro ${ROS2_DISTRO} && \
+#     # `RTI_NC_LICENSE_ACCEPTED=yes' to escape from interactive interface. 
+#     RTI_NC_LICENSE_ACCEPTED=yes rosdep install --from-paths ${DEPENDENCIES_DIR}/ros2-linux/share --ignore-src -y --skip-keys "\
+#     cyclonedds \
+#     fastcdr \
+#     fastrtps \
+#     urdfdom_headers \
+#     rti-connext-dds-${RTI_CONNEXT_DDS_VERSION} \
+#     "
 
 # Neovim
 ARG NEOVIM_VERSION
@@ -223,23 +247,20 @@ RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
 RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') && \
     curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
     tar xf lazygit.tar.gz lazygit && \
-    install -Dm 755 lazygit ~/.local/bin && \
+    install -Dm 755 lazygit ${XDG_PREFIX_HOME}/bin && \
     rm lazygit.tar.gz lazygit
 
 # Managers and plugins
 RUN \
     # Install starship, a cross-shell prompt tool
-    wget -qO- https://starship.rs/install.sh | sudo sh -s -- --yes --arch x86_64 && \
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    musl-tools \
+    && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
+    wget -qO- https://starship.rs/install.sh | sh -s -- --yes -b ${XDG_PREFIX_HOME}/bin && \
     # Install oh-my-zsh
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && \
-    # Install zsh plugins
-    git clone --depth 1 https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting && \
-    git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions && \
-    git clone --depth 1 https://github.com/conda-incubator/conda-zsh-completion ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/conda-zsh-completion && \
-    # Install packer.nvim
-    git clone --depth 1 https://github.com/wbthomason/packer.nvim ~/.local/share/nvim/site/pack/packer/start/packer.nvim && \
     # Install tpm
-    git clone --depth 1 https://github.com/tmux-plugins/tpm ~/.local/share/tmux/plugins/tpm && \
+    git clone --depth 1 https://github.com/tmux-plugins/tpm ${XDG_PREFIX_HOME}/share/tmux/plugins/tpm && \
     # Install nvm, without modification of shell profiles
     export NVM_DIR=~/.config/nvm && mkdir -p ${NVM_DIR} && \
     PROFILE=/dev/null bash -c 'wget -qO- "https://github.com/nvm-sh/nvm/raw/master/install.sh" | bash' && \
@@ -247,39 +268,42 @@ RUN \
     . "${NVM_DIR}/nvm.sh" && nvm install --lts node
 
 # Dotfiles
-ARG DOTFILES_GIT_HASH
+# ARG DOTFILES_GIT_HASH
+ARG SETUP_TIMESTAMP
 RUN cd ~ && \
-    git init --initial-branch=main && \
-    git checkout -b docker && \
+    git init && \
     git remote add origin https://github.com/xiaosq2000/dotfiles && \
     git fetch --all && \
-    git reset --hard ${DOTFILES_GIT_HASH}
+    git reset --hard origin/main && \
+    git branch -M main
 
-# Python
-RUN \
-    # Download the latest pyenv (python version and venv manager)
-    curl https://pyenv.run | bash && \
-    # Download the latest miniconda
-    mkdir -p ~/.local/miniconda3 && \
-    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/.local/miniconda.sh && \
-    bash ~/.local/miniconda.sh -b -u -p ~/.local/miniconda3 && \
-    rm -rf ~/.local/miniconda.sh && \
-    # Set up conda and pyenv, without conflicts, Ref: https://stackoverflow.com/a/58045893/11393911
-    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc && \
-    echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc && \
-    echo 'eval "$(pyenv init -)"' >> ~/.zshrc && \
-    cd ~/.local/miniconda3/bin && \
-    ./conda init zsh && \
-    ./conda config --set auto_activate_base false
+# # Python
+# RUN \
+#     # Download the latest pyenv (python version and venv manager)
+#     curl https://pyenv.run | bash && \
+#     # Download the latest miniconda
+#     mkdir -p ~/.local/miniconda3 && \
+#     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/.local/miniconda.sh && \
+#     bash ~/.local/miniconda.sh -b -u -p ~/.local/miniconda3 && \
+#     rm -rf ~/.local/miniconda.sh && \
+#     # Set up conda and pyenv, without conflicts, Ref: https://stackoverflow.com/a/58045893/11393911
+#     echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc && \
+#     echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc && \
+#     echo 'eval "$(pyenv init -)"' >> ~/.zshrc && \
+#     cd ~/.local/miniconda3/bin && \
+#     ./conda init zsh && \
+#     ./conda config --set auto_activate_base false
 
 SHELL ["/usr/bin/zsh", "-ic"]
 
-RUN conda create -y -n pytorch python=3.11 && \
-    conda activate pytorch && \
-    conda install -y gxx==11.4.0 cudatoolkit==11.7 cudatoolkit-dev==11.7 -c conda-forge && \
-    conda install -y pytorch==2.1.2 torchvision==0.16.2 -c pytorch
-
 ENV TERM=xterm-256color
+
+# Micromamba
+RUN cd ${XDG_PREFIX_HOME} && \
+    # For Linux Intel (x86_64)
+    curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba && \
+    micromamba config append channels conda-forge && \
+    micromamba config set channel_priority strict
 
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt

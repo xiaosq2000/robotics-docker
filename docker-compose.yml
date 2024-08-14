@@ -1,8 +1,8 @@
 version: "3.8"
 services:
   robotics:
-    image: shuqixiao:dev
-    container_name: shuqixiao_dev
+    image: ros:${UBUNTU_DISTRO}-${ROS_DISTRO}
+    container_name: ros
     env_file: ./.env
     user: ${DOCKER_UID}:${DOCKER_GID}
     network_mode: ${RUNTIME_NETWORK_MODE}
@@ -14,20 +14,21 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0', '1', '2', '3', '4', '5', '6', '7']
+              device_ids: ['0']
               capabilities: ["gpu"]
-    ports:
-      - "2222:22"
-    command: ["/usr/bin/sudo", "/usr/sbin/sshd", "-D"]
+              # ports:
+              #   - "2222:22"
+              # command: ["/usr/bin/sudo", "/usr/sbin/sshd", "-D"]
+  
     volumes:
       # x11 socket
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # ssh public keys
+      # shared workspaces
+      - ~/Datasets/:/home/${DOCKER_USER}/Datasets:rw
+      - ~/Projects/:/home/${DOCKER_USER}/Projects:rw
+      - ~/Documents/:/home/${DOCKER_USER}/Documents:rw
+      # shared ssh public keys
       - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
-      # data
-      - /mnt/dev-ssd-8T/shuqixiao/:/home/${DOCKER_USER}/data:ro
-      # code
-      - ~/code/:/home/${DOCKER_USER}/code:rw
     build:
       context: .
       network: ${BUILDTIME_NETWORK_MODE}
@@ -41,6 +42,7 @@ services:
         UBUNTU_DISTRO: ${UBUNTU_DISTRO}
         COMPILE_JOBS: ${COMPILE_JOBS}
         DEPENDENCIES_DIR: ${DEPENDENCIES_DIR}
+        ROS_DISTRO: ${ROS_DISTRO}
         ROS2_DISTRO: ${ROS2_DISTRO}
         ROS2_RELEASE_DATE: ${ROS2_RELEASE_DATE}
         RTI_CONNEXT_DDS_VERSION: ${RTI_CONNEXT_DDS_VERSION}
