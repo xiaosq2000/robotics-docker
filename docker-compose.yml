@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   robotics:
     image: ros:${UBUNTU_DISTRO}-${ROS_DISTRO}
@@ -61,6 +60,6 @@ services:
         DOCKER_GID: ${DOCKER_GID}
     stdin_open: true
     tty: true
-    # ipc: host
-    # privileged: true
+    ipc: host
+    privileged: true
     restart: always
