@@ -1,65 +1,55 @@
 services:
   robotics:
-    image: ros:${UBUNTU_DISTRO}-${ROS_DISTRO}
+    build:
+      args:
+        ARCH: ${ARCH}
+        BASE_IMAGE: ${BASE_IMAGE}
+        BUILDTIME_NETWORK_MODE: ${BUILDTIME_NETWORK_MODE}
+        COMPILE_JOBS: ${COMPILE_JOBS}
+        DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
+        DOCKER_GID: ${DOCKER_GID}
+        DOCKER_HOME: ${DOCKER_HOME}
+        DOCKER_UID: ${DOCKER_UID}
+        DOCKER_USER: ${DOCKER_USER}
+        NEOVIM_VERSION: ${NEOVIM_VERSION}
+        OS: ${OS}
+        ROS_DISTRO: ${ROS_DISTRO}
+        SETUP_TIMESTAMP: ${SETUP_TIMESTAMP}
+        TMUX_GIT_HASH: ${TMUX_GIT_HASH}
+        UBUNTU_DISTRO: ${UBUNTU_DISTRO}
+        XDG_PREFIX_DIR: ${XDG_PREFIX_DIR}
+        buildtime_http_proxy: ${buildtime_http_proxy}
+        buildtime_https_proxy: ${buildtime_https_proxy}
+      context: .
+      dockerfile: Dockerfile
+      network: ${BUILDTIME_NETWORK_MODE}
+      target: robotics
     container_name: ros
-    env_file: ./.env
-    user: ${DOCKER_UID}:${DOCKER_GID}
-    network_mode: ${RUNTIME_NETWORK_MODE}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    runtime: ${RUNTIME}
     deploy:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: ["gpu"]
-              # ports:
-              #   - "2222:22"
-              # command: ["/usr/bin/sudo", "/usr/sbin/sshd", "-D"]
-  
-    volumes:
-      # x11 socket
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # shared workspaces
-      - ~/Datasets/:/home/${DOCKER_USER}/Datasets:rw
-      - ~/Projects/:/home/${DOCKER_USER}/Projects:rw
-      - ~/Documents/:/home/${DOCKER_USER}/Documents:rw
-      # shared ssh public keys
-      - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
-    build:
-      context: .
-      network: ${BUILDTIME_NETWORK_MODE}
-      dockerfile: Dockerfile
-      target: robotics
-      args:
-        DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
-        OS: ${OS}
-        ARCH: ${ARCH}
-        BASE_IMAGE: ${BASE_IMAGE}
-        UBUNTU_DISTRO: ${UBUNTU_DISTRO}
-        COMPILE_JOBS: ${COMPILE_JOBS}
-        DEPENDENCIES_DIR: ${DEPENDENCIES_DIR}
-        ROS_DISTRO: ${ROS_DISTRO}
-        ROS2_DISTRO: ${ROS2_DISTRO}
-        ROS2_RELEASE_DATE: ${ROS2_RELEASE_DATE}
-        RTI_CONNEXT_DDS_VERSION: ${RTI_CONNEXT_DDS_VERSION}
-        OPENCV_VERSION: ${OPENCV_VERSION}
-        OPENCV_CONTRIB_VERSION: ${OPENCV_CONTRIB_VERSION}
-        CERES_VERSION: ${CERES_VERSION}
-        NEOVIM_VERSION: ${NEOVIM_VERSION}
-        TMUX_GIT_HASH: ${TMUX_GIT_HASH}
-        DOTFILES_GIT_HASH: ${DOTFILES_GIT_HASH}
-        http_proxy: ${buildtime_http_proxy}
-        https_proxy: ${buildtime_https_proxy}
-        HTTP_PROXY: ${BUILDTIME_HTTP_PROXY}
-        HTTPS_PROXY: ${BUILDTIME_HTTPS_PROXY}
-        DOCKER_USER: ${DOCKER_USER}
-        DOCKER_UID: ${DOCKER_UID}
-        DOCKER_GID: ${DOCKER_GID}
-    stdin_open: true
-    tty: true
+          - capabilities:
+            - gpu
+            device_ids:
+            - '0'
+            driver: nvidia
+    env_file: ./.env
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    image: ros:${UBUNTU_DISTRO}-${ROS_DISTRO}
     ipc: host
+    network_mode: ${RUNTIME_NETWORK_MODE}
     privileged: true
     restart: always
+    runtime: ${RUNTIME}
+    stdin_open: true
+    tty: true
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    volumes:
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - /run/user:/run/user:rw
+    - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
+    - ~/Datasets:/home/${DOCKER_USER}/Datasets:rw
+    - ~/Projects:/home/${DOCKER_USER}/Projects:rw
+    - ~/Documents:/home/${DOCKER_USER}/Documents:rw
