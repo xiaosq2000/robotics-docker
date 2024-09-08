@@ -195,8 +195,9 @@ RUN cd ~ && \
     git fetch --all && \
     git reset --hard origin/main
 
-SHELL ["/usr/bin/zsh", "-ic"]
 ENV TERM=xterm-256color
+SHELL ["/usr/bin/zsh", "-ic"]
+RUN sudo chsh -s /usr/bin/zsh
 
 RUN micromamba config append channels conda-forge && \
     micromamba config set channel_priority strict
@@ -208,6 +209,7 @@ ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
 
+CMD [ "zsh" ]
 ################################################################################
 ################################### Archive ####################################
 ################################################################################

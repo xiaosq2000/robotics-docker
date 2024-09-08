@@ -12,31 +12,31 @@ A dockerized development environment for robotics research and development.
 
 ### 1. Setup
 
-```bash
-./setup.bash
+```sh
+./setup.sh
 ```
 
 ### 2. Build
 
-```bash
+```sh
 docker compose build
 ```
 
 ### 3. Start
 
-```bash
+```sh
 docker compose up -d 
 ```
 
 ### 4. Use
 
-```bash
+```sh
 docker exec -it robotics zsh
 ```
 
 ## Customization
 
-Make sure to synchronize changes across the three files: `Dockerfile`, `docker-compose.yml`, and `setup.bash`.
+Make sure to synchronize changes across the three files: `Dockerfile`, `docker-compose.yml`, and `setup.sh`.
 
 ## Todo
 
