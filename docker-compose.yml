@@ -5,6 +5,8 @@ services:
         ARCH: ${ARCH}
         BASE_IMAGE: ${BASE_IMAGE}
         BUILDTIME_NETWORK_MODE: ${BUILDTIME_NETWORK_MODE}
+        CERES_VERSION: ${CERES_VERSION}
+        CMAKE_VERSION: ${CMAKE_VERSION}
         COMPILE_JOBS: ${COMPILE_JOBS}
         DOCKER_BUILDKIT: ${DOCKER_BUILDKIT}
         DOCKER_GID: ${DOCKER_GID}
@@ -13,18 +15,20 @@ services:
         DOCKER_USER: ${DOCKER_USER}
         NEOVIM_VERSION: ${NEOVIM_VERSION}
         OS: ${OS}
+        PCL_VERSION: ${PCL_VERSION}
         ROS_DISTRO: ${ROS_DISTRO}
         SETUP_TIMESTAMP: ${SETUP_TIMESTAMP}
         TMUX_GIT_HASH: ${TMUX_GIT_HASH}
         UBUNTU_DISTRO: ${UBUNTU_DISTRO}
+        VTK_VERSION: ${VTK_VERSION}
         XDG_PREFIX_DIR: ${XDG_PREFIX_DIR}
         buildtime_http_proxy: ${buildtime_http_proxy}
         buildtime_https_proxy: ${buildtime_https_proxy}
       context: .
       dockerfile: Dockerfile
       network: ${BUILDTIME_NETWORK_MODE}
-      target: robotics
-    container_name: ros
+      target: building_vtk
+    container_name: robotics
     deploy:
       resources:
         reservations:
@@ -37,7 +41,7 @@ services:
     env_file: ./.env
     extra_hosts:
     - host.docker.internal:host-gateway
-    image: ros:${UBUNTU_DISTRO}-${ROS_DISTRO}
+    image: robotics:${UBUNTU_DISTRO}
     ipc: host
     network_mode: ${RUNTIME_NETWORK_MODE}
     privileged: true
@@ -48,8 +52,9 @@ services:
     user: ${DOCKER_UID}:${DOCKER_GID}
     volumes:
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    - /run/user:/run/user:rw
-    - ~/.ssh/authorized_keys:/home/${DOCKER_USER}/.ssh/authorized_keys:rw
+    - /var/run/dbus:/var/run/dbus:rw
+    - /run/user/${DOCKER_UID}:/run/user/${DOCKER_UID}:rw
+    - ~/.ssh:${DOCKER_HOME}/.ssh:rw
     - ~/Datasets:/home/${DOCKER_USER}/Datasets:rw
     - ~/Projects:/home/${DOCKER_USER}/Projects:rw
     - ~/Documents:/home/${DOCKER_USER}/Documents:rw

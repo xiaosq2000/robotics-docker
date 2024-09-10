@@ -1,24 +1,30 @@
 # syntax=docker/dockerfile:1
-ARG OS 
-ARG ARCH 
+
 ARG BASE_IMAGE
-FROM --platform=${OS}/${ARCH} ${BASE_IMAGE} as development_base
+FROM ${BASE_IMAGE} as base
+
+RUN if [ $(cat /etc/os-release | grep '^NAME' | cut -d '=' -f 2) = '"Ubuntu"' ] && [ $(cat /etc/os-release | grep '^VERSION_ID' | cut -d '=' -f 2) = '"24.04"' ]; then touch /var/mail/ubuntu && chown ubuntu /var/mail/ubuntu && userdel -r ubuntu; fi
+
 # Networking proxies
 ARG buildtime_http_proxy 
 ARG buildtime_https_proxy
-ENV http_proxy ${http_proxy}
-ENV https_proxy ${https_proxy}
-ENV HTTP_PROXY ${http_proxy}
-ENV HTTPS_PROXY ${https_proxy}
+ENV http_proxy ${buildtime_http_proxy}
+ENV HTTP_PROXY ${buildtime_http_proxy}
+ENV https_proxy ${buildtime_https_proxy}
+ENV HTTPS_PROXY ${buildtime_https_proxy}
+
 # Avoid getting stuck with interactive interfaces when using apt-get
 ENV DEBIAN_FRONTEND noninteractive
+
 # Set the basic locale environment variables.
 ENV LC_ALL en_US.UTF-8 
 ENV LANG en_US.UTF-8  
 ENV LANGUAGE en_US
+
 # Set the parent directory for all dependencies (not installed).
-ARG XDG_PREFIX_DIR=/usr/local
+ARG XDG_PREFIX_DIR
 ENV XDG_PREFIX_DIR=${XDG_PREFIX_DIR}
+
 WORKDIR ${XDG_PREFIX_DIR}
 
 RUN apt-get update && \
@@ -76,10 +82,10 @@ RUN apt-get update && \
     # Set locales
     sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && locale-gen
 
-FROM development_base AS building_base
-ARG COMPILE_JOBS
-FROM development_base as robotics
+FROM base as intermediate
+
 # Set up a non-root user within the sudo group.
+# Warning: 'sudo' is not recommended in Dockerfile.
 ARG DOCKER_USER 
 ARG DOCKER_UID
 ARG DOCKER_GID 
@@ -88,10 +94,6 @@ RUN groupadd -g ${DOCKER_GID} ${DOCKER_USER} && \
     useradd -r -m -d ${DOCKER_HOME} -s /bin/bash -g ${DOCKER_GID} -u ${DOCKER_UID} -G sudo ${DOCKER_USER} && \
     echo ${DOCKER_USER} ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/${DOCKER_USER} && \
     chmod 0440 /etc/sudoers.d/${DOCKER_USER}
-
-################################################################################
-####################### Personal Development Environment #######################
-################################################################################
 
 USER ${DOCKER_USER}
 WORKDIR ${DOCKER_HOME}
@@ -104,7 +106,50 @@ ENV XDG_STATE_HOME=${DOCKER_HOME}/.local/state
 ENV XDG_CACHE_HOME=${DOCKER_HOME}/.cache
 ENV XDG_PREFIX_HOME=${DOCKER_HOME}/.local
 
-# TODO: Manually build and install without sudo privilege
+ENV PATH="${XDG_PREFIX_HOME}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${XDG_PREFIX_HOME}/lib:${PATH}"
+ENV MAN_PATH="${XDG_PREFIX_HOME}/man:${PATH}"
+
+# Install Cmake
+ARG CMAKE_VERSION
+RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz && \
+    tar -zxf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz && \
+    export SOURCE_DIR=${PWD}/cmake-${CMAKE_VERSION}-linux-x86_64 && export DEST_DIR=${XDG_PREFIX_HOME} && \
+    (cd ${SOURCE_DIR} && find . -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \;) && \
+    rm -r cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz cmake-${CMAKE_VERSION}-linux-x86_64
+
+ARG COMPILE_JOBS
+
+# Build Ceres-solver.
+FROM intermediate AS building_ceres
+ARG CERES_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/ceres-solver-${CERES_VERSION}.tar.gz .
+RUN tar -zxf ceres-solver-${CERES_VERSION}.tar.gz && \ 
+    cd ceres-solver-${CERES_VERSION} && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 && \
+    cmake --build build -j ${COMPILE_JOBS}
+
+# Build PCL
+FROM intermediate AS building_vtk
+ARG VTK_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/VTK-${VTK_VERSION}.tar.gz .
+
+FROM intermediate AS building_pcl
+ARG PCL_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/pcl-${PCL_VERSION}.tar.gz .
+RUN tar -zxf pcl-${PCL_VERSION}.tar.gz && \
+    cd pcl && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_CUDA_STANDARD=17 && \
+    cmake --build build -j ${COMPILE_JOBS}
+
+FROM intermediate AS robotics
+
+ARG CERES_VERSION
+COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} ${XDG_PREFIX_DIR}/ceres-solver-${CERES_VERSION} ${XDG_PREFIX_HOME}/ceres-solver-${CERES_VERSION}
+
+ARG PCL_VERSION
+COPY --from=building_pcl --chown=${DOCKER_USER}:${DOCKER_USER} ${XDG_PREFIX_DIR}/pcl ${XDG_PREFIX_HOME}/pcl-${PCL_VERSION}
+
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     lsb-release \
     wget curl \
@@ -114,25 +159,21 @@ RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     ripgrep fd-find \
     && sudo rm -rf /var/lib/apt/lists/*
 
+# Install ROS1 (desktop-full) via package manager
 ARG ROS_DISTRO
 RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' && \
     curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add - && \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     ros-${ROS_DISTRO}-desktop-full \
-    python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential \
+    python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential python3-catkin-tools \
     && sudo rm -rf /var/lib/apt/lists/* \
-    sudo rosdep init
-# ref: https://answers.ros.org/question/284683/rosdep-update-error-in-kinetic/
-RUN if [ -z "${http_proxy}" ]; then unset http_proxy && unset https_proxy && unset HTTP_PROXY && unset HTTPS_PROXY; fi && \
-    source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    sudo rosdep init && \
+    # ref: https://answers.ros.org/question/284683/rosdep-update-error-in-kinetic/
+    # if [ -z "${http_proxy}" ]; then unset http_proxy && unset https_proxy && unset HTTP_PROXY && unset HTTPS_PROXY; fi && \
+    source /opt/ros/${ROS_DISTRO}/setup.sh && \
     sudo rosdep init && \
     sudo apt update && \
     rosdep update
-
-# Set up ssh server
-RUN sudo mkdir -p /var/run/sshd && \
-    sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config && \
-    sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
 # Neovim
 ARG NEOVIM_VERSION
@@ -155,14 +196,14 @@ RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     make install && \
     rm -rf ../tmux
 
-# Lazygit (newest version)
-RUN LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') && \
+
+RUN \
+    # Install lazygit (the newest version)
+    LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*') && \
     curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz" && \
     tar xf lazygit.tar.gz lazygit && \
     install -Dm 755 lazygit ${XDG_PREFIX_HOME}/bin && \
-    rm lazygit.tar.gz lazygit
-
-RUN \
+    rm lazygit.tar.gz lazygit && \
     # Install starship, a cross-shell prompt tool
     mkdir -p ${XDG_PREFIX_HOME}/bin && \
     wget -qO- https://starship.rs/install.sh | sh -s -- --yes -b ${XDG_PREFIX_HOME}/bin && \
@@ -180,27 +221,34 @@ RUN \
     # Load nvm and install the latest lts nodejs
     . "${NVM_DIR}/nvm.sh" && nvm install --lts node
 
-# Micromamba (For Linux Intel (x86_64))
+# Install mamba and conda
 RUN cd ${XDG_PREFIX_HOME} && \
-    curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba
+    curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj bin/micromamba && \
+    bin/micromamba config append channels conda-forge && \
+    bin/micromamba config set channel_priority strict && \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+    bash Miniconda3-latest-Linux-x86_64.sh -b -p ${XDG_PREFIX_HOME}/miniconda3 && \
+    rm Miniconda3-latest-Linux-x86_64.sh && \
+    miniconda3/bin/conda config --set auto_activate_base false
+
+# Set up ssh server
+RUN sudo mkdir -p /var/run/sshd && \
+    sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config && \
+    sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
 # A trick to get rid of using Docker building cache from now on.
 ARG SETUP_TIMESTAMP
-
 # Dotfiles
 RUN cd ~ && \
     git init && \
-    # git branch -M main && \
     git remote add origin https://github.com/xiaosq2000/dotfiles && \
     git fetch --all && \
-    git reset --hard origin/main
+    git reset --hard origin/main && \
+    git branch -M main
 
 ENV TERM=xterm-256color
 SHELL ["/usr/bin/zsh", "-ic"]
-RUN sudo chsh -s /usr/bin/zsh
-
-RUN micromamba config append channels conda-forge && \
-    micromamba config set channel_priority strict
+# RUN sudo chsh -s /usr/bin/zsh
 
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt
@@ -209,7 +257,7 @@ ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
 
-CMD [ "zsh" ]
+# CMD [ "zsh" ]
 ################################################################################
 ################################### Archive ####################################
 ################################################################################
