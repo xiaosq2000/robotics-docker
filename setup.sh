@@ -20,20 +20,24 @@ info() {
 	printf '%s\n' "${BOLD}${GREEN}INFO:${RESET} $*"
 }
 debug() {
-	printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
+	set +u
+	if [[ "$DEBUG" == "true" ]]; then
+		set -u
+		printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
+	fi
 }
 completed() {
 	printf '%s\n' "${BOLD}${GREEN}✓${RESET} $*"
 }
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Arguments >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-build=false
-download=false
-build_with_proxy=false
-run_with_proxy=false
-run_with_nvidia=false
+BUILD=false
+DOWNLOAD=false
+BUILD_WITH_PROXY=false
+RUN_WITH_PROXY=false
+RUN_WITH_NVIDIA=false
 
-usage() {
+display_help_messages() {
 	printf "%s\n" \
 		"Usage: " \
 		"${INDENT}$0 [option]" \
@@ -46,6 +50,7 @@ usage() {
 		"${INDENT}-bp, --build_with_proxy" \
 		"${INDENT}-rp, --run_with_proxy  " \
 		"${INDENT}-rn, --run_with_nvidia " \
+		"${INDENT}--debug" \
 		""
 }
 
@@ -53,47 +58,48 @@ usage() {
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 	-h | --help)
-		usage
+		display_help_messages
 		exit 0
 		;;
 	-b | --build)
-		build=true
+		BUILD=true
 		shift
 		;;
 	-bp | --build_with_proxy)
-		build_with_proxy=true
+		BUILD_WITH_PROXY=true
 		shift
 		;;
 	-rp | --run_with_proxy)
-		run_with_proxy=true
+		RUN_WITH_PROXY=true
 		shift
 		;;
 	-rn | --run_with_nvidia)
-		run_with_nvidia=true
+		RUN_WITH_NVIDIA=true
 		shift
 		;;
 	-d | --download)
-		download=true
+		DOWNLOAD=true
+		shift
+		;;
+	--debug)
+		DEBUG=true
 		shift
 		;;
 	*)
 		error "Unknown argument: $1"
-		usage
+		display_help_messages
+        exit 1;
 		;;
 	esac
 done
 
-if [[ $# == 0 ]]; then
-	usage
-fi
-
-printf "%s\n" "${GREEN}Given Arguments${RESET}:" \
-	"${INDENT}build=${BOLD}$build${RESET}" \
-	"${INDENT}build_with_proxy=${BOLD}$build_with_proxy${RESET}" \
-	"${INDENT}run_with_proxy=${BOLD}$run_with_proxy${RESET}" \
-	"${INDENT}run_with_nvidia=${BOLD}$run_with_nvidia${RESET}" \
-	"${INDENT}download=${BOLD}$download${RESET}" \
-	""
+debug "
+${BOLD}Given Arguments${RESET}:
+${INDENT}build=$BUILD
+${INDENT}build_with_proxy=$BUILD_WITH_PROXY
+${INDENT}run_with_proxy=$RUN_WITH_PROXY
+${INDENT}run_with_nvidia=$RUN_WITH_NVIDIA
+${INDENT}download=$DOWNLOAD"
 
 # TODO: autocompletion of arguments
 #
@@ -119,8 +125,8 @@ buildtime_env=$(
 		UBUNTU_DISTRO=focal
 		COMPILE_JOBS=$(($(nproc --all) / 2))
 		XDG_PREFIX_DIR=/usr/local
-		ROS_DISTRO=noetic
-		# ROS2_DISTRO=humble
+		ROS1_DISTRO=noetic
+		ROS2_DISTRO=foxy
 		# ROS2_RELEASE_DATE=20240129
 		# RTI_CONNEXT_DDS_VERSION=6.0.1
 		OPENCV_VERSION=4.10.0
@@ -138,7 +144,7 @@ buildtime_env=$(
 
 	END
 )
-if [[ "$build_with_proxy" == "true" ]]; then
+if [[ "$BUILD_WITH_PROXY" == "true" ]]; then
 	warning "Make sure you have configured the 'buildtime_networking_env' in setup.sh."
 	buildtime_networking_env=$(
 		cat <<-END
@@ -162,7 +168,7 @@ else
 		END
 	)
 fi
-if [[ "$run_with_proxy" == "true" ]]; then
+if [[ "$RUN_WITH_PROXY" == "true" ]]; then
 	warning "Make sure you have configured the 'runtime_networking_env' in setup.sh."
 	runtime_networking_env=$(
 		cat <<-END
@@ -201,7 +207,7 @@ user_env=$(
 
 	END
 )
-if [[ "$run_with_nvidia" == "true" ]]; then
+if [[ "$RUN_WITH_NVIDIA" == "true" ]]; then
 	runtime_env=$(
 		cat <<-END
 
@@ -227,7 +233,7 @@ fi
 
 echo "# ! The file is managed by 'setup.sh'." >>${env_file}
 echo "# ! Don't modify it manually. Change 'setup.sh' instead." >>${env_file}
-if [[ "${build}" = true ]]; then
+if [[ "${BUILD}" = true ]]; then
 	echo "${buildtime_env}" >>${env_file}
 	echo "${buildtime_networking_env}" >>${env_file}
 	python3 "$script_dir/setup.d/build_args.py" "robotics"
@@ -236,7 +242,7 @@ echo "${runtime_networking_env}" >>${env_file}
 echo "${user_env}" >>${env_file}
 echo "${runtime_env}" >>${env_file}
 python3 "$script_dir/setup.d/nvidia.py" "robotics"
-info "Environment variables are saved to ${env_file}"
+debug "Environment variables are saved to ${env_file}"
 
 # Load varibles from a file
 # Reference: https://stackoverflow.com/a/30969768
@@ -287,7 +293,7 @@ _download_everything() {
 	fi
 }
 
-if [ "${download}" = true ]; then
+if [ "${DOWNLOAD}" = true ]; then
 	downloads_dir="${script_dir}/downloads"
 	mkdir -p "${downloads_dir}"
 

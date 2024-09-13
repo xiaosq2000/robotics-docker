@@ -235,11 +235,11 @@ RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     && sudo rm -rf /var/lib/apt/lists/*
 
 # Install ROS1 (desktop-full) via package manager
-ARG ROS_DISTRO
+ARG ROS1_DISTRO
 RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' && \
     curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add - && \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
-    ros-${ROS_DISTRO}-desktop-full \
+    ros-${ROS1_DISTRO}-desktop-full \
     python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential python3-catkin-tools \
     && sudo rm -rf /var/lib/apt/lists/* \
     sudo rosdep init && \
@@ -250,10 +250,19 @@ RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) 
     unset HTTP_PROXY && \
     unset HTTPS_PROXY; \
     fi && \
-    source /opt/ros/${ROS_DISTRO}/setup.sh && \
+    source /opt/ros/${ROS1_DISTRO}/setup.sh && \
     sudo rosdep init && \
     sudo apt update && \
     rosdep update
+
+# Install ROS2 (desktop-full) via package manager
+ARG ROS2_DISTRO
+RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    ros-${ROS2_DISTRO}-desktop python3-argcomplete \
+    ros-dev-tools \
+    && sudo rm -rf /var/lib/apt/lists/*
 
 FROM intermediate-ros AS robotics
 
