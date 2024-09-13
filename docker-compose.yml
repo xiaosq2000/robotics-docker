@@ -4,6 +4,7 @@ services:
       args:
         ARCH: ${ARCH}
         BASE_IMAGE: ${BASE_IMAGE}
+        BOOST_VERSION: ${BOOST_VERSION}
         BUILDTIME_NETWORK_MODE: ${BUILDTIME_NETWORK_MODE}
         CERES_VERSION: ${CERES_VERSION}
         CMAKE_VERSION: ${CMAKE_VERSION}
@@ -13,12 +14,15 @@ services:
         DOCKER_HOME: ${DOCKER_HOME}
         DOCKER_UID: ${DOCKER_UID}
         DOCKER_USER: ${DOCKER_USER}
+        FLANN_VERSION: ${FLANN_VERSION}
         NEOVIM_VERSION: ${NEOVIM_VERSION}
+        OPENCV_CONTRIB_VERSION: ${OPENCV_CONTRIB_VERSION}
+        OPENCV_VERSION: ${OPENCV_VERSION}
         OS: ${OS}
-        PCL_VERSION: ${PCL_VERSION}
+        PCL_GIT_REFERENCE: ${PCL_GIT_REFERENCE}
         ROS_DISTRO: ${ROS_DISTRO}
         SETUP_TIMESTAMP: ${SETUP_TIMESTAMP}
-        TMUX_GIT_HASH: ${TMUX_GIT_HASH}
+        TMUX_GIT_REFERENCE: ${TMUX_GIT_REFERENCE}
         UBUNTU_DISTRO: ${UBUNTU_DISTRO}
         VTK_VERSION: ${VTK_VERSION}
         XDG_PREFIX_DIR: ${XDG_PREFIX_DIR}
@@ -27,7 +31,8 @@ services:
       context: .
       dockerfile: Dockerfile
       network: ${BUILDTIME_NETWORK_MODE}
-      target: building_vtk
+      target: robotics
+    command: zsh
     container_name: robotics
     deploy:
       resources:

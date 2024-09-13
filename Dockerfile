@@ -110,7 +110,7 @@ ENV PATH="${XDG_PREFIX_HOME}/bin:${PATH}"
 ENV LD_LIBRARY_PATH="${XDG_PREFIX_HOME}/lib:${PATH}"
 ENV MAN_PATH="${XDG_PREFIX_HOME}/man:${PATH}"
 
-# Install Cmake
+# Download and install Cmake
 ARG CMAKE_VERSION
 RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz && \
     tar -zxf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz && \
@@ -119,6 +119,7 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cm
     rm -r cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz cmake-${CMAKE_VERSION}-linux-x86_64
 
 ARG COMPILE_JOBS
+WORKDIR ${XDG_PREFIX_HOME}
 
 # Build Ceres-solver.
 FROM intermediate AS building_ceres
@@ -127,28 +128,102 @@ COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/ceres-solver-${CERES_VERS
 RUN tar -zxf ceres-solver-${CERES_VERSION}.tar.gz && \ 
     cd ceres-solver-${CERES_VERSION} && \
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 && \
-    cmake --build build -j ${COMPILE_JOBS}
+    cmake --build build -j ${COMPILE_JOBS} && \
+    mkdir -p install && \
+    cmake --install build --prefix ${PWD}/install
+
+# Build OpenCV.
+FROM intermediate AS building_opencv
+ARG OPENCV_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/opencv-${OPENCV_VERSION}.tar.gz .
+ARG OPENCV_CONTRIB_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz .
+RUN tar -zxf opencv-${OPENCV_VERSION}.tar.gz && \
+    tar -zxf opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz && \
+    rm *.tar.gz && \
+    cd opencv-${OPENCV_VERSION} && \
+    cmake . -B build \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${OPENCV_CONTRIB_VERSION}/modules \
+    -DBUILD_SHARED_LIBS=ON \
+    -DENABLE_PIC=ON \
+    -DOPENCV_GENERATE_PKGCONFIG=ON \
+    -DBUILD_TESTS=OFF \
+    -DBUILD_PERF_TESTS=OFF \
+    -DBUILD_EXAMPLES=ON \
+    -DBUILD_opencv_apps=OFF \
+    # CUDA has issues with LTO support 
+    # Ref: https://forums.developer.nvidia.com/t/link-time-optimization-with-cuda-on-linux-flto/55531/6
+    -DENABLE_LTO=OFF \
+    -DOPENCV_IPP_GAUSSIAN_BLUR=ON \
+    -DOPENCV_IPP_MEAN=ON \
+    -DOPENCV_IPP_MINMAX=ON \
+    -DOPENCV_IPP_SUM=ON \
+    -DWITH_CUDA=ON \
+    -DWITH_V4L=ON \
+    -DWITH_FFMPEG=ON \
+    -DWITH_TBB=ON \
+    -DWITH_OPENMP=ON \
+    -DWITH_GTK=ON \
+    && cmake --build build -j ${COMPILE_JOBS} && \
+    mkdir install && \
+    cmake --install build --prefix ${PWD}/install
 
 # Build PCL
-FROM intermediate AS building_vtk
+FROM intermediate AS building_pcl_dependencies
+
+ARG BOOST_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/boost-${BOOST_VERSION}.tar.gz .
+RUN mkdir boost-${BOOST_VERSION} && tar -zxf boost-${BOOST_VERSION}.tar.gz --strip-component=1 -C boost-${BOOST_VERSION} && rm boost-${BOOST_VERSION}.tar.gz && \
+    cd boost-${BOOST_VERSION} && \
+    ./bootstrap.sh && \
+    mkdir install && \
+    ./b2 install --prefix=${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}/install
+
 ARG VTK_VERSION
-COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/VTK-${VTK_VERSION}.tar.gz .
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/vtk-${VTK_VERSION}.tar.gz .
+RUN mkdir vtk-${VTK_VERSION} && tar -zxf vtk-${VTK_VERSION}.tar.gz --strip-component=1 -C vtk-${VTK_VERSION} && rm vtk-${VTK_VERSION}.tar.gz && \
+    cd vtk-${VTK_VERSION} && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 && \
+    cmake --build build -j ${COMPILE_JOBS} && \
+    mkdir install && \
+    cmake --install build --prefix ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}/install
 
-FROM intermediate AS building_pcl
-ARG PCL_VERSION
-COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/pcl-${PCL_VERSION}.tar.gz .
-RUN tar -zxf pcl-${PCL_VERSION}.tar.gz && \
-    cd pcl && \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_CUDA_STANDARD=17 && \
-    cmake --build build -j ${COMPILE_JOBS}
+ARG FLANN_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} ./downloads/flann-${FLANN_VERSION}.tar.gz .
+RUN sudo apt-get update && \
+    sudo apt-get install -qy --no-install-recommends \
+    liblz4-dev \
+    && sudo rm -rf /var/lib/apt/lists/* && \
+    mkdir flann-${FLANN_VERSION} && tar -zxf flann-${FLANN_VERSION}.tar.gz --strip-component=1 -C flann-${FLANN_VERSION} && rm flann-${FLANN_VERSION}.tar.gz && \
+    cd flann-${FLANN_VERSION} && \
+    # reference: https://github.com/flann-lib/flann/issues/369#issuecomment-932793309
+    touch src/cpp/empty.cpp && \
+    sed -e '/add_library(flann_cpp SHARED/ s/""/empty.cpp/' \
+    -e '/add_library(flann SHARED/ s/""/empty.cpp/' \
+    -i src/cpp/CMakeLists.txt && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 && \
+    cmake --build build -j ${COMPILE_JOBS} && \
+    # A fix for invalid -DFLANN_ROOT=./build in pcl
+    mkdir install && cmake --install build --prefix ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}/install
 
-FROM intermediate AS robotics
+FROM building_pcl_dependencies as building_pcl
+ARG BOOST_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}/install ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}
+ARG VTK_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}/install ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}
+ARG FLANN_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}/install ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}
+ARG PCL_GIT_REFERENCE
+RUN git clone --config http.proxy="${http_proxy}" --config https.proxy="${https_proxy}" --depth 1 https://github.com/PointCloudLibrary/pcl.git && \
+    cd pcl && \ 
+    git checkout ${PCL_GIT_REFERENCE} && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_CUDA_STANDARD=17 -DBoost_NO_SYSTEM_PATHS=ON -DBOOST_ROOT=${XDG_PREFIX_HOME}/boost-${BOOST_VERSION} -DVTK_DIR=${XDG_PREFIX_HOME}/vtk-${VTK_VERSION} -DFLANN_ROOT=${XDG_PREFIX_HOME}/flann-${FLANN_VERSION} && \
+    cmake --build build -j ${COMPILE_JOBS} && \
+    mkdir -p install && \
+    cmake --install build --prefix ${PWD}/install
 
-ARG CERES_VERSION
-COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} ${XDG_PREFIX_DIR}/ceres-solver-${CERES_VERSION} ${XDG_PREFIX_HOME}/ceres-solver-${CERES_VERSION}
-
-ARG PCL_VERSION
-COPY --from=building_pcl --chown=${DOCKER_USER}:${DOCKER_USER} ${XDG_PREFIX_DIR}/pcl ${XDG_PREFIX_HOME}/pcl-${PCL_VERSION}
+FROM intermediate AS intermediate-ros
 
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     lsb-release \
@@ -169,11 +244,18 @@ RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) 
     && sudo rm -rf /var/lib/apt/lists/* \
     sudo rosdep init && \
     # ref: https://answers.ros.org/question/284683/rosdep-update-error-in-kinetic/
-    # if [ -z "${http_proxy}" ]; then unset http_proxy && unset https_proxy && unset HTTP_PROXY && unset HTTPS_PROXY; fi && \
+    if [ -z "${http_proxy}" ]; then \
+    unset http_proxy && \
+    unset https_proxy && \
+    unset HTTP_PROXY && \
+    unset HTTPS_PROXY; \
+    fi && \
     source /opt/ros/${ROS_DISTRO}/setup.sh && \
     sudo rosdep init && \
     sudo apt update && \
     rosdep update
+
+FROM intermediate-ros AS robotics
 
 # Neovim
 ARG NEOVIM_VERSION
@@ -184,18 +266,17 @@ RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/
     rm -r nvim-linux64.tar.gz nvim-linux64
 
 # Tmux
-ARG TMUX_GIT_HASH
+ARG TMUX_GIT_REFERENCE
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake \
     && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
     git clone "https://github.com/tmux/tmux" && cd tmux && \
-    git checkout ${TMUX_GIT_HASH} && \
+    git checkout ${TMUX_GIT_REFERENCE} && \
     sh autogen.sh && \
     ./configure --prefix=${DOCKER_HOME}/.local && \
     make -j ${COMPILE_JOBS} && \
     make install && \
     rm -rf ../tmux
-
 
 RUN \
     # Install lazygit (the newest version)
@@ -236,6 +317,19 @@ RUN sudo mkdir -p /var/run/sshd && \
     sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config && \
     sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
+ARG BOOST_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}/install ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}
+ARG VTK_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}/install ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}
+ARG FLANN_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}/install ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}
+ARG CERES_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_ceres ${XDG_PREFIX_HOME}/ceres-solver-${CERES_VERSION}/install ${XDG_PREFIX_HOME}/ceres-solver-${CERES_VERSION}
+ARG PCL_GIT_REFERENCE
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl ${XDG_PREFIX_HOME}/pcl/install ${XDG_PREFIX_HOME}/pcl-${PCL_GIT_REFERENCE}
+ARG OPENCV_VERSION
+COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_opencv ${XDG_PREFIX_HOME}/opencv-${OPENCV_VERSION}/install ${XDG_PREFIX_HOME}/opencv-${OPENCV_VERSION}
+
 # A trick to get rid of using Docker building cache from now on.
 ARG SETUP_TIMESTAMP
 # Dotfiles
@@ -248,7 +342,6 @@ RUN cd ~ && \
 
 ENV TERM=xterm-256color
 SHELL ["/usr/bin/zsh", "-ic"]
-# RUN sudo chsh -s /usr/bin/zsh
 
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt
@@ -257,7 +350,7 @@ ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
 
-# CMD [ "zsh" ]
+WORKDIR ${DOCKER_HOME}
 ################################################################################
 ################################### Archive ####################################
 ################################################################################
@@ -295,52 +388,6 @@ ENV HTTPS_PROXY=
 #     urdfdom_headers \
 #     rti-connext-dds-${RTI_CONNEXT_DDS_VERSION} \
 #     "
-# # Build OpenCV.
-# FROM building_base AS building_opencv
-# ARG OPENCV_VERSION
-# ADD ./downloads/opencv-${OPENCV_VERSION}.tar.gz .
-# ARG OPENCV_CONTRIB_VERSION
-# ADD ./downloads/opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz .
-# RUN cd opencv-${OPENCV_VERSION} && \
-#     cmake . -Bbuild \
-#     -DCMAKE_BUILD_TYPE=Release \
-#     -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${OPENCV_CONTRIB_VERSION}/modules \
-#     -DBUILD_SHARED_LIBS=ON \
-#     -DENABLE_PIC=ON \
-#     -DOPENCV_GENERATE_PKGCONFIG=ON \
-#     -DBUILD_TESTS=OFF \
-#     -DBUILD_PERF_TESTS=OFF \
-#     -DBUILD_EXAMPLES=OFF \
-#     -DBUILD_opencv_apps=OFF \
-#     # CUDA has issues with LTO support 
-#     # Ref: https://forums.developer.nvidia.com/t/link-time-optimization-with-cuda-on-linux-flto/55530/6
-#     -DENABLE_LTO=OFF \
-#     -DOPENCV_IPP_GAUSSIAN_BLUR=ON \
-#     -DOPENCV_IPP_MEAN=ON \
-#     -DOPENCV_IPP_MINMAX=ON \
-#     -DOPENCV_IPP_SUM=ON \
-#     -DWITH_CUDA=ON \
-#     -DWITH_V4L=ON \
-#     -DWITH_FFMPEG=ON \
-#     -DWITH_TBB=ON \
-#     -DWITH_OPENMP=ON \
-#     -DWITH_GTK=ON \
-#     && cmake --build build -j ${COMPILE_JOBS}
-
-# # Build Ceres-solver.
-# FROM building_base AS building_ceres
-# ARG CERES_VERSION
-# ADD ./downloads/ceres-solver-${CERES_VERSION}.tar.gz .
-# RUN cd ceres-solver-${CERES_VERSION} && \
-#     cmake . -Bbuild -DCMAKE_BUILD_TYPE=Release && \
-#     cmake --build build -j ${COMPILE_JOBS}
-
-# # Copy Ceres solver binaries.
-# ARG CERES_VERSION
-# COPY --from=building_ceres --chown=${DOCKER_USER}:${DOCKER_USER} ${XDG_PREFIX_DIR}/ceres-solver-${CERES_VERSION} ceres-solver-${CERES_VERSION}
-# # Copy OpenCV binaries.
-# ARG OPENCV_VERSION
-# COPY --from=building_opencv --chown=${DOCKER_USER}:${DOCKER_USER} ${XDG_PREFIX_DIR}/opencv-${OPENCV_VERSION} opencv-${OPENCV_VERSION}
 # # Copy pre-built CARLA simulator
 # RUN apt-get update && apt-get install -qy --no-install-recommends \
 #     # runtime dependencies

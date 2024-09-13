@@ -123,14 +123,16 @@ buildtime_env=$(
 		# ROS2_DISTRO=humble
 		# ROS2_RELEASE_DATE=20240129
 		# RTI_CONNEXT_DDS_VERSION=6.0.1
-		# OPENCV_VERSION=4.8.0
-		# OPENCV_CONTRIB_VERSION=4.8.1
+		OPENCV_VERSION=4.10.0
+		OPENCV_CONTRIB_VERSION=4.10.0
 		CMAKE_VERSION=3.30.3
 		CERES_VERSION=2.2.0
+		BOOST_VERSION=1.86.0
+		FLANN_VERSION=1.9.2
 		VTK_VERSION=9.3.1
-		PCL_VERSION=1.14.1
+		PCL_GIT_REFERENCE=master
 		NEOVIM_VERSION=0.10.1
-		TMUX_GIT_HASH=9ae69c3
+		TMUX_GIT_REFERENCE=3.4
 		SETUP_TIMESTAMP=$(date +%N)
 		# <<< as services.robotics.build.args
 
@@ -290,10 +292,11 @@ if [ "${download}" = true ]; then
 	mkdir -p "${downloads_dir}"
 
 	_append_to_list CERES_VERSION "http://ceres-solver.org/ceres-solver-${CERES_VERSION}.tar.gz" ""
-    _append_to_list VTK_VERSION "https://www.vtk.org/files/release/$(echo ${VTK_VERSION} | cut -d '.' -f 1,2)/VTK-${VTK_VERSION}.tar.gz" ""
-	_append_to_list PCL_VERSION "https://github.com/PointCloudLibrary/pcl/releases/download/pcl-${PCL_VERSION}/source.tar.gz" "pcl-${PCL_VERSION}.tar.gz"
-	# _append_to_list OPENCV_VERSION "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" "opencv-${OPENCV_VERSION}.tar.gz"
-	# _append_to_list OPENCV_CONTRIB_VERSION "https://github.com/opencv/opencv_contrib/archive/refs/tags/${OPENCV_CONTRIB_VERSION}.tar.gz" "opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz"
+	_append_to_list BOOST_VERSION "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_$(echo ${BOOST_VERSION} | sed 's/\./_/g').tar.gz" "boost-${BOOST_VERSION}.tar.gz"
+	_append_to_list FLANN_VERSION "https://github.com/flann-lib/flann/archive/refs/tags/${FLANN_VERSION}.tar.gz" "flann-${FLANN_VERSION}.tar.gz"
+	_append_to_list VTK_VERSION "https://www.vtk.org/files/release/$(echo ${VTK_VERSION} | cut -d '.' -f 1,2)/VTK-${VTK_VERSION}.tar.gz" "vtk-${VTK_VERSION}.tar.gz"
+	_append_to_list OPENCV_VERSION "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" "opencv-${OPENCV_VERSION}.tar.gz"
+	_append_to_list OPENCV_CONTRIB_VERSION "https://github.com/opencv/opencv_contrib/archive/refs/tags/${OPENCV_CONTRIB_VERSION}.tar.gz" "opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz"
 	# _append_to_list ROS2_DISTRO "https://github.com/ros2/ros2/releases/download/release-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}/ros2-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}-${OS}-${UBUNTU_DISTRO}-${ARCH}.tar.bz2" ""
 	# _append_to_list CARLA_VERSION "https://carla-releases.s3.eu-west-3.amazonaws.com/Linux/CARLA_${CARLA_VERSION}.tar.gz" ""
 
