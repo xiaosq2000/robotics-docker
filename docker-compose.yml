@@ -20,34 +20,21 @@ services:
         OPENCV_VERSION: ${OPENCV_VERSION}
         OS: ${OS}
         PCL_GIT_REFERENCE: ${PCL_GIT_REFERENCE}
-        ROS1_DISTRO: ${ROS1_DISTRO}
         ROS2_DISTRO: ${ROS2_DISTRO}
         SETUP_TIMESTAMP: ${SETUP_TIMESTAMP}
         TMUX_GIT_REFERENCE: ${TMUX_GIT_REFERENCE}
-        UBUNTU_DISTRO: ${UBUNTU_DISTRO}
         VTK_VERSION: ${VTK_VERSION}
         XDG_PREFIX_DIR: ${XDG_PREFIX_DIR}
-        buildtime_http_proxy: ${buildtime_http_proxy}
-        buildtime_https_proxy: ${buildtime_https_proxy}
       context: .
       dockerfile: Dockerfile
       network: ${BUILDTIME_NETWORK_MODE}
-      target: robotics
+      target: robotics-devel
     command: zsh
-    container_name: robotics
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - capabilities:
-            - gpu
-            device_ids:
-            - '0'
-            driver: nvidia
+    container_name: ${CONTAINER_NAME}
     env_file: ./.env
     extra_hosts:
     - host.docker.internal:host-gateway
-    image: robotics:${UBUNTU_DISTRO}
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
     ipc: host
     network_mode: ${RUNTIME_NETWORK_MODE}
     privileged: true

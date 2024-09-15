@@ -13,7 +13,7 @@ if len(sys.argv) != 2:
 service_name = sys.argv[1]
 
 # Read the contents of the bash script
-with open("setup.sh", "r") as file:
+with open(".env", "r") as file:
     bash_content = file.read()
 
 # Extract all build argument names from the bash script based on the specified rule

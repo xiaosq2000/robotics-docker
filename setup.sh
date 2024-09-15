@@ -32,7 +32,7 @@ completed() {
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Arguments >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 BUILD=false
-DOWNLOAD=false
+ENSURE_DOWNLOAD=false
 BUILD_WITH_PROXY=false
 RUN_WITH_PROXY=false
 RUN_WITH_NVIDIA=false
@@ -44,13 +44,13 @@ display_help_messages() {
 		""
 	printf "%s\n" \
 		"Options: " \
-		"${INDENT}-h, --help             " \
-		"${INDENT}-b, --build            " \
-		"${INDENT}-d, --download         " \
-		"${INDENT}-bp, --build_with_proxy" \
-		"${INDENT}-rp, --run_with_proxy  " \
-		"${INDENT}-rn, --run_with_nvidia " \
-		"${INDENT}--debug" \
+		"${INDENT}-h, --help                 Display help messages              " \
+		"${INDENT}-b, --build                Generate build-time environment variables for 'docker-compose.yml'" \
+		"${INDENT}-d, --download             Ensure some build-time dependencies are downloaded to './downloads'. No worry about repetitions of downloading." \
+		"${INDENT}-bp, --build_with_proxy    Use networking proxy for docker image build-time" \
+		"${INDENT}-rp, --run_with_proxy      Use networking proxy for docker container run-time" \
+		"${INDENT}-rn, --run_with_nvidia     Configure NVIDIA container runtime " \
+		"${INDENT}--debug                    Print logging for debugging        " \
 		""
 }
 
@@ -78,7 +78,7 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	-d | --download)
-		DOWNLOAD=true
+		ENSURE_DOWNLOAD=true
 		shift
 		;;
 	--debug)
@@ -88,18 +88,17 @@ while [[ $# -gt 0 ]]; do
 	*)
 		error "Unknown argument: $1"
 		display_help_messages
-        exit 1;
+		exit 1
 		;;
 	esac
 done
 
-debug "
-${BOLD}Given Arguments${RESET}:
+debug "Given Arguments:
 ${INDENT}build=$BUILD
 ${INDENT}build_with_proxy=$BUILD_WITH_PROXY
 ${INDENT}run_with_proxy=$RUN_WITH_PROXY
 ${INDENT}run_with_nvidia=$RUN_WITH_NVIDIA
-${INDENT}download=$DOWNLOAD"
+${INDENT}download=$ENSURE_DOWNLOAD"
 
 # TODO: autocompletion of arguments
 #
@@ -114,63 +113,73 @@ env_file=${script_dir}/.env
 # Clear the file
 cat /dev/null >${env_file}
 
-buildtime_env=$(
+SERVICE_NAME="robotics"
+compose_env=$(
 	cat <<-END
 
-		# >>> as services.robotics.build.args
+		IMAGE_NAME=robotics
+		IMAGE_TAG=noble
+		CONTAINER_NAME=robotics-noble
+
+	END
+)
+build_env=$(
+	cat <<-END
+
+		# >>> as services.${SERVICE_NAME}.build.args
 		DOCKER_BUILDKIT=1
 		OS=linux
 		ARCH=amd64
-		BASE_IMAGE=nvcr.io/nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
-		UBUNTU_DISTRO=focal
-		COMPILE_JOBS=$(($(nproc --all) / 2))
+		BASE_IMAGE=nvidia/cuda:12.6.1-cudnn-devel-ubuntu24.04
+		COMPILE_JOBS=$(($(nproc --all) / 4))
 		XDG_PREFIX_DIR=/usr/local
-		ROS1_DISTRO=noetic
-		ROS2_DISTRO=foxy
+		# ROS1_DISTRO=noetic
+		ROS2_DISTRO=jazzy
 		# ROS2_RELEASE_DATE=20240129
 		# RTI_CONNEXT_DDS_VERSION=6.0.1
-		OPENCV_VERSION=4.10.0
-		OPENCV_CONTRIB_VERSION=4.10.0
+		OPENCV_VERSION=4.9.0
+		OPENCV_CONTRIB_VERSION=4.9.0
 		CMAKE_VERSION=3.30.3
 		CERES_VERSION=2.2.0
 		BOOST_VERSION=1.86.0
 		FLANN_VERSION=1.9.2
 		VTK_VERSION=9.3.1
-		PCL_GIT_REFERENCE=master
+		PCL_GIT_REFERENCE=641b06e
 		NEOVIM_VERSION=0.10.1
 		TMUX_GIT_REFERENCE=3.4
 		SETUP_TIMESTAMP=$(date +%N)
-		# <<< as services.robotics.build.args
+		# <<< as services.${SERVICE_NAME}.build.args
 
 	END
 )
 if [[ "$BUILD_WITH_PROXY" == "true" ]]; then
-	warning "Make sure you have configured the 'buildtime_networking_env' in setup.sh."
-	buildtime_networking_env=$(
+	build_networking_env=$(
 		cat <<-END
 
-			# >>> as services.robotics.build.args
+			# >>> as services.${SERVICE_NAME}.build.args
 			BUILDTIME_NETWORK_MODE=host
 			buildtime_http_proxy=http://127.0.0.1:1080
 			buildtime_https_proxy=http://127.0.0.1:1080
-			# <<< as services.robotics.build.args
+			# <<< as services.${SERVICE_NAME}.build.args
 
 		END
 	)
 else
-	buildtime_networking_env=$(
+	build_networking_env=$(
 		cat <<-END
 
-			# >>> as services.robotics.build.args
+			# >>> as services.${SERVICE_NAME}.build.args
 			BUILDTIME_NETWORK_MODE=host
-			# <<< as services.robotics.build.args
+			# <<< as services.${SERVICE_NAME}.build.args
 
 		END
 	)
 fi
+debug "Following build-time networking environment variables are used.
+$build_networking_env
+"
 if [[ "$RUN_WITH_PROXY" == "true" ]]; then
-	warning "Make sure you have configured the 'runtime_networking_env' in setup.sh."
-	runtime_networking_env=$(
+	run_networking_env=$(
 		cat <<-END
 
 			RUNTIME_NETWORK_MODE=bridge
@@ -187,7 +196,7 @@ if [[ "$RUN_WITH_PROXY" == "true" ]]; then
 		END
 	)
 else
-	runtime_networking_env=$(
+	run_networking_env=$(
 		cat <<-END
 
 			RUNTIME_NETWORK_MODE=bridge
@@ -195,20 +204,23 @@ else
 		END
 	)
 fi
-user_env=$(
+debug "Following runtime networking environment variables are used.
+$run_networking_env
+"
+run_and_build_user_env=$(
 	cat <<-END
 
-		# >>> as services.robotics.build.args
+		# >>> as services.${SERVICE_NAME}.build.args
 		DOCKER_USER=robotics
 		DOCKER_HOME=/home/robotics
 		DOCKER_UID=$(id -u)
 		DOCKER_GID=$(id -g)
-		# <<< as services.robotics.build.args
+		# <<< as services.${SERVICE_NAME}.build.args
 
 	END
 )
 if [[ "$RUN_WITH_NVIDIA" == "true" ]]; then
-	runtime_env=$(
+	container_runtime_env=$(
 		cat <<-END
 
 			RUNTIME=nvidia
@@ -219,8 +231,9 @@ if [[ "$RUN_WITH_NVIDIA" == "true" ]]; then
 
 		END
 	)
+	python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}" --run-with-nvidia
 else
-	runtime_env=$(
+	container_runtime_env=$(
 		cat <<-END
 
 			RUNTIME=runc
@@ -229,19 +242,20 @@ else
 
 		END
 	)
+	python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}"
 fi
 
-echo "# ! The file is managed by 'setup.sh'." >>${env_file}
-echo "# ! Don't modify it manually. Change 'setup.sh' instead." >>${env_file}
+echo "# ! The file is managed by '$(basename "$0")'." >>${env_file}
+echo "# ! Don't edit '${env_file}' manually. Change '$(basename "$0")' instead." >>${env_file}
+echo "${compose_env}" >>${env_file}
+echo "${run_and_build_user_env}" >>${env_file}
 if [[ "${BUILD}" = true ]]; then
-	echo "${buildtime_env}" >>${env_file}
-	echo "${buildtime_networking_env}" >>${env_file}
-	python3 "$script_dir/setup.d/build_args.py" "robotics"
+	echo "${build_env}" >>${env_file}
+	echo "${build_networking_env}" >>${env_file}
+	python3 "$script_dir/setup.d/build_args.py" "${SERVICE_NAME}"
 fi
-echo "${runtime_networking_env}" >>${env_file}
-echo "${user_env}" >>${env_file}
-echo "${runtime_env}" >>${env_file}
-python3 "$script_dir/setup.d/nvidia.py" "robotics"
+echo "${run_networking_env}" >>${env_file}
+echo "${container_runtime_env}" >>${env_file}
 debug "Environment variables are saved to ${env_file}"
 
 # Load varibles from a file
@@ -258,7 +272,7 @@ wget_paths=()
 _append_to_list() {
 	# $1: flag
 	if [ -z "$(eval echo "\$$1")" ]; then
-		warning "$1 is unset. Failed to append to the downloading list."
+		warning "$1 is unset or empty. Failed to append to the downloading list."
 		return 0
 	fi
 	# $2: url
@@ -269,10 +283,8 @@ _append_to_list() {
 	else
 		filename="$3"
 	fi
-	if [ ! -f "${downloads_dir}/${filename}" ]; then
-		wget_paths+=("${downloads_dir}/${filename}")
-		wget_urls+=("$url")
-	fi
+	wget_paths+=("${downloads_dir}/${filename}")
+	wget_urls+=("$url")
 }
 _wget_all() {
 	for i in "${!wget_urls[@]}"; do
@@ -284,16 +296,13 @@ _download_everything() {
 	if [ ${#wget_urls[@]} = 0 ]; then
 		debug "No download tasks."
 	else
-		debug "${#wget_urls[@]} files to download:"
-		(
-			IFS=$'\n'
-			echo "${wget_urls[*]}"
-		)
+		debug "Check ${#wget_urls[@]} files:
+$(printf '%s\n' ${wget_urls[@]})"
 		_wget_all
 	fi
 }
 
-if [ "${DOWNLOAD}" = true ]; then
+if [ "${ENSURE_DOWNLOAD}" = true ]; then
 	downloads_dir="${script_dir}/downloads"
 	mkdir -p "${downloads_dir}"
 
@@ -309,4 +318,4 @@ if [ "${DOWNLOAD}" = true ]; then
 	_download_everything
 fi
 
-info "Done."
+completed "Done."

@@ -208,12 +208,14 @@ RUN sudo apt-get update && \
     mkdir install && cmake --install build --prefix ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}/install
 
 FROM building_pcl_dependencies as building_pcl
+
 ARG BOOST_VERSION
 COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}/install ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}
 ARG VTK_VERSION
 COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}/install ${XDG_PREFIX_HOME}/vtk-${VTK_VERSION}
 ARG FLANN_VERSION
 COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}/install ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}
+
 ARG PCL_GIT_REFERENCE
 RUN git clone --config http.proxy="${http_proxy}" --config https.proxy="${https_proxy}" --depth 1 https://github.com/PointCloudLibrary/pcl.git && \
     cd pcl && \ 
@@ -236,7 +238,8 @@ RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
 
 # Install ROS1 (desktop-full) via package manager
 ARG ROS1_DISTRO
-RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' && \
+RUN if [ ! -z "${ROS1_DISTRO}" ]; then \
+    sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list' && \
     curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add - && \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     ros-${ROS1_DISTRO}-desktop-full \
@@ -253,39 +256,56 @@ RUN sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) 
     source /opt/ros/${ROS1_DISTRO}/setup.sh && \
     sudo rosdep init && \
     sudo apt update && \
-    rosdep update
+    rosdep update \
+    ;fi
 
 # Install ROS2 (desktop-full) via package manager
 ARG ROS2_DISTRO
-RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+RUN if [ ! -z "${ROS2_DISTRO}" ]; then \
+    sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null && \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
-    ros-${ROS2_DISTRO}-desktop python3-argcomplete \
+    ros-${ROS2_DISTRO}-desktop \
+    python3-argcomplete \
     ros-dev-tools \
-    && sudo rm -rf /var/lib/apt/lists/*
+    && sudo rm -rf /var/lib/apt/lists/* \
+    ;fi
 
-FROM intermediate-ros AS robotics
+FROM intermediate-ros AS robotics-devel
 
 # Neovim
 ARG NEOVIM_VERSION
-RUN wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" -O nvim-linux64.tar.gz && \
+RUN if [ ! -z "${NEOVIM_VERSION}" ]; then \
+    wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" -O nvim-linux64.tar.gz && \
     tar -xf nvim-linux64.tar.gz && \
-    export SOURCE_DIR=${PWD}/nvim-linux64 && export DEST_DIR=${HOME}/.local && \
-    (cd ${SOURCE_DIR} && find . -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \;) && \
-    rm -r nvim-linux64.tar.gz nvim-linux64
+    export SOURCE_DIR=${PWD}/nvim-linux64 && export DEST_DIR=${XDG_PREFIX_HOME} && \
+    find ${SOURCE_DIR} -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \; && \
+    rm -r nvim-linux64.tar.gz nvim-linux64 \
+    ;else \
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    neovim \
+    && sudo rm -fr /var/lib/apt/lists/* \
+    ;fi
 
 # Tmux
 ARG TMUX_GIT_REFERENCE
-RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+RUN if [ ! -z "${TMUX_GIT_REFERENCE}" ]; then \
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake \
-    && sudo rm -fr /var/lib/apt/lists/{apt,dpkg,cache,log} /tmp/* /var/tmp/* && \
-    git clone "https://github.com/tmux/tmux" && cd tmux && \
+    && sudo rm -fr /var/lib/apt/lists/* && \
+    git clone --config http.proxy=${http_proxy} --config https.proxy=${https_proxy} "https://github.com/tmux/tmux" && \ 
+    cd tmux && \
     git checkout ${TMUX_GIT_REFERENCE} && \
     sh autogen.sh && \
     ./configure --prefix=${DOCKER_HOME}/.local && \
     make -j ${COMPILE_JOBS} && \
     make install && \
-    rm -rf ../tmux
+    rm -rf ../tmux \
+    ;else \
+    sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    tmux \
+    && sudo rm -fr /var/lib/apt/lists/* \
+    ;fi
 
 RUN \
     # Install lazygit (the newest version)
