@@ -11,114 +11,111 @@ BLUE="$(tput setaf 4 2>/dev/null || printf '')"
 MAGENTA="$(tput setaf 5 2>/dev/null || printf '')"
 RESET="$(tput sgr0 2>/dev/null || printf '')"
 error() {
-    printf '%s\n' "${BOLD}${RED}ERROR:${RESET} $*" >&2
+	printf '%s\n' "${BOLD}${RED}ERROR:${RESET} $*" >&2
 }
 warning() {
-    printf '%s\n' "${BOLD}${YELLOW}WARNING:${RESET} $*"
+	printf '%s\n' "${BOLD}${YELLOW}WARNING:${RESET} $*"
 }
 info() {
-    printf '%s\n' "${BOLD}${GREEN}INFO:${RESET} $*"
+	printf '%s\n' "${BOLD}${GREEN}INFO:${RESET} $*"
 }
 debug() {
-    set +u
-    if [[ "$DEBUG" == "true" ]]; then
-        set -u
-        printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
-    fi
+	set +u
+	if [[ "$DEBUG" == "true" ]]; then
+		set -u
+		printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
+	fi
 }
 completed() {
-    printf '%s\n' "${BOLD}${GREEN}✓${RESET} $*"
+	printf '%s\n' "${BOLD}${GREEN}✓${RESET} $*"
 }
 
 # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Arguments >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 BUILD=false
 ENSURE_DOWNLOAD=false
-BUILD_WITH_PROXY=false
-RUN_WITH_PROXY=false
-RUN_WITH_NVIDIA=false
-RUN_WITH_WAYLAND=false
+BUILD_PROXY=false
+RUN_PROXY=false
+NVIDIA=false
+WAYLAND=false
 
 display_help_messages() {
-    printf "%s\n" \
-        "Usage: " \
-        "${INDENT}$0 [option]" \
-        "" \
-        "${INDENT}Generate 'docker-compose.yml' and '.env' for Docker build-time and run-time usage." \
-        "${INDENT}Download specified build-time dependencies." \
-        "${INDENT}${RED}Before running, You are suggested checking out the environment variables written in $0.${RESET}" \
-        "" \
-        "${INDENT}Recommended command for the first time," \
-        "" \
-        "${INDENT}${INDENT}\$ $0 -b -d -rn" \
-        ""
-    printf "%s\n" \
-        "Options: " \
-        "${INDENT}-h, --help                 Display help messages." \
-        "${INDENT}--debug                    Display verbose logging for debugging." \
-        "" \
-        "${INDENT}-b, --build                Generate build-time environment variables for 'docker-compose.yml'." \
-        "${INDENT}                           If not given, only run-time environment variables will be generated." \
-        "${INDENT}-d, --download             Ensure some build-time dependencies are downloaded to './downloads'." \
-        "" \
-        "${INDENT}-bp, --build_with_proxy    Use networking proxy for docker image build-time." \
-        "${INDENT}-rp, --run_with_proxy      Use networking proxy for docker container run-time." \
-        "" \
-        "${INDENT}-rn, --run_with_nvidia     Configure NVIDIA container runtime." \
-        "${INDENT}-rw, --run_with_wayland    Configure WAYLAND environment variables instead of X11." \
-        ""
+	printf "%s\n" \
+		"Usage: " \
+		"${INDENT}$0 [option]" \
+		"" \
+		"${INDENT}Download specified build-time dependencies." \
+		"${INDENT}Generate 'docker-compose.yml' and '.env' for Docker build-time and run-time usage." \
+		"" \
+		"${INDENT}${BOLD}Before running, You could check out the environment variables written in $0.${RESET}" \
+		"" \
+		"${INDENT}Recommended command for the first time," \
+		"" \
+		"${INDENT}${INDENT}\$ $0 -b -d -n" \
+		""
+	printf "%s\n" \
+		"Options: " \
+		"" \
+		"${INDENT}-b, --build            Generate build-time environment variables for 'docker-compose.yml'." \
+		"${INDENT}                       If not given, only run-time environment variables will be generated." \
+		"${INDENT}-d, --download         Ensure some build-time dependencies are downloaded to './downloads'." \
+		"" \
+		"${INDENT}-bp, --build-proxy     Use networking proxy for docker image build-time." \
+		"${INDENT}-rp, --run-proxy       Use networking proxy for docker container run-time." \
+		"" \
+		"${INDENT}-n, --nvidia           Configure NVIDIA container runtime. Make sure the nvidia container toolkit is installed and configured." \
+		"${INDENT}                       Reference: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html" \
+		"" \
+		"${INDENT}-w, --wayland          Configure (X)WAYLAND run-time environment variables." \
+		"${INDENT}                       If not given, X11 run-time environment variables will be configured." \
+		"" \
+		"${INDENT}-h, --help             Display help messages." \
+		"${INDENT}--debug                Display verbose logging for debugging." \
+		""
 }
 
 # TODO: autocompletion of arguments
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-    -h | --help)
-        display_help_messages
-        exit 0
-        ;;
-    --debug)
-        DEBUG=true
-        shift
-        ;;
-    -b | --build)
-        BUILD=true
-        shift
-        ;;
-    -d | --download)
-        ENSURE_DOWNLOAD=true
-        shift
-        ;;
-    -bp | --build_with_proxy)
-        BUILD_WITH_PROXY=true
-        shift
-        ;;
-    -rp | --run_with_proxy)
-        RUN_WITH_PROXY=true
-        shift
-        ;;
-    -rn | --run_with_nvidia)
-        RUN_WITH_NVIDIA=true
-        shift
-        ;;
-    -rw | --run_with_wayland)
-        RUN_WITH_WAYLAND=true
-        shift
-        ;;
-    *)
-        error "Unknown argument: $1"
-        display_help_messages
-        exit 1
-        ;;
-    esac
+	case "$1" in
+	-h | --help)
+		display_help_messages
+		exit 0
+		;;
+	--debug)
+		DEBUG=true
+		shift
+		;;
+	-b | --build)
+		BUILD=true
+		shift
+		;;
+	-d | --download)
+		ENSURE_DOWNLOAD=true
+		shift
+		;;
+	-bp | --build-proxy)
+		BUILD_PROXY=true
+		shift
+		;;
+	-rp | --run-proxy)
+		RUN_PROXY=true
+		shift
+		;;
+	-n | --nvidia)
+		NVIDIA=true
+		shift
+		;;
+	-w | --wayland)
+		WAYLAND=true
+		shift
+		;;
+	*)
+		error "Unknown argument: $1"
+		display_help_messages
+		exit 1
+		;;
+	esac
 done
-
-debug "Given Arguments:
-${INDENT}build=$BUILD
-${INDENT}build_with_proxy=$BUILD_WITH_PROXY
-${INDENT}run_with_proxy=$RUN_WITH_PROXY
-${INDENT}run_with_nvidia=$RUN_WITH_NVIDIA
-${INDENT}run_with_wayland=$RUN_WITH_WAYLAND
-${INDENT}download=$ENSURE_DOWNLOAD"
 
 # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< Arguments <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 #
@@ -133,7 +130,7 @@ cat /dev/null >${env_file}
 
 SERVICE_NAME="robotics"
 compose_env=$(
-    cat <<-END
+	cat <<-END
 
 		IMAGE_NAME=robotics
 		IMAGE_TAG=noble
@@ -142,7 +139,7 @@ compose_env=$(
 	END
 )
 build_env=$(
-    cat <<-END
+	cat <<-END
 
 		# >>> as services.${SERVICE_NAME}.build.args
 		DOCKER_BUILDKIT=1
@@ -170,9 +167,9 @@ build_env=$(
 
 	END
 )
-if [[ "$BUILD_WITH_PROXY" == "true" ]]; then
-    build_networking_env=$(
-        cat <<-END
+if [[ "$BUILD_PROXY" == "true" ]]; then
+	build_networking_env=$(
+		cat <<-END
 
 			# >>> as services.${SERVICE_NAME}.build.args
 			BUILDTIME_NETWORK_MODE=host
@@ -181,24 +178,24 @@ if [[ "$BUILD_WITH_PROXY" == "true" ]]; then
 			# <<< as services.${SERVICE_NAME}.build.args
 
 		END
-    )
+	)
 else
-    build_networking_env=$(
-        cat <<-END
+	build_networking_env=$(
+		cat <<-END
 
 			# >>> as services.${SERVICE_NAME}.build.args
 			BUILDTIME_NETWORK_MODE=host
 			# <<< as services.${SERVICE_NAME}.build.args
 
 		END
-    )
+	)
 fi
 debug "Following build-time networking environment variables are used.
 $build_networking_env
 "
-if [[ "$RUN_WITH_PROXY" == "true" ]]; then
-    run_networking_env=$(
-        cat <<-END
+if [[ "$RUN_PROXY" == "true" ]]; then
+	run_networking_env=$(
+		cat <<-END
 
 			RUNTIME_NETWORK_MODE=bridge
 			http_proxy=http://host.docker.internal:1080
@@ -212,21 +209,21 @@ if [[ "$RUN_WITH_PROXY" == "true" ]]; then
 			# HTTPS_PROXY=http://127.0.0.1:1080
 
 		END
-    )
+	)
 else
-    run_networking_env=$(
-        cat <<-END
+	run_networking_env=$(
+		cat <<-END
 
 			RUNTIME_NETWORK_MODE=bridge
 
 		END
-    )
+	)
 fi
 debug "Following runtime networking environment variables are used.
 $run_networking_env
 "
 run_and_build_user_env=$(
-    cat <<-END
+	cat <<-END
 
 		# >>> as services.${SERVICE_NAME}.build.args
 		DOCKER_USER=robotics
@@ -237,30 +234,30 @@ run_and_build_user_env=$(
 
 	END
 )
-if [[ "$RUN_WITH_NVIDIA" == "true" ]]; then
-    container_runtime_env=$(
-        cat <<-END
+if [[ "$NVIDIA" == "true" ]]; then
+	container_runtime_env=$(
+		cat <<-END
 
 			RUNTIME=nvidia
 			NVIDIA_VISIBLE_DEVICES=all
 			NVIDIA_DRIVER_CAPABILITIES=all
 
 		END
-    )
-    python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}" --run-with-nvidia
+	)
+	python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}" --run-with-nvidia
 else
-    container_runtime_env=$(
-        cat <<-END
+	container_runtime_env=$(
+		cat <<-END
 
 			RUNTIME=runc
 
 		END
-    )
-    python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}"
+	)
+	python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}"
 fi
-if [[ "${RUN_WITH_WAYLAND}" == true ]]; then
-    display_runtime_env=$(
-        cat <<-END
+if [[ "${WAYLAND}" == true ]]; then
+	display_runtime_env=$(
+		cat <<-END
 
 			DISPLAY=${DISPLAY}
 			WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
@@ -268,16 +265,16 @@ if [[ "${RUN_WITH_WAYLAND}" == true ]]; then
 			QT_QPA_PLATFORM=wayland
 
 		END
-    )
+	)
 else
-    display_runtime_env=$(
-        cat <<-END
+	display_runtime_env=$(
+		cat <<-END
 
 			DISPLAY=${DISPLAY}
 			SDL_VIDEODRIVER=x11
 
 		END
-    )
+	)
 fi
 
 echo "# ! The file is managed by '$(basename "$0")'." >>${env_file}
@@ -285,9 +282,9 @@ echo "# ! Don't edit '${env_file}' manually. Change '$(basename "$0")' instead."
 echo "${compose_env}" >>${env_file}
 echo "${run_and_build_user_env}" >>${env_file}
 if [[ "${BUILD}" = true ]]; then
-    echo "${build_env}" >>${env_file}
-    echo "${build_networking_env}" >>${env_file}
-    python3 "$script_dir/setup.d/build_args.py" "${SERVICE_NAME}"
+	echo "${build_env}" >>${env_file}
+	echo "${build_networking_env}" >>${env_file}
+	python3 "$script_dir/setup.d/build_args.py" "${SERVICE_NAME}"
 fi
 echo "${run_networking_env}" >>${env_file}
 echo "${container_runtime_env}" >>${env_file}
@@ -306,52 +303,52 @@ set -o allexport && source ${env_file} && set +o allexport
 wget_urls=()
 wget_paths=()
 _append_to_list() {
-    # $1: flag
-    if [ -z "$(eval echo "\$$1")" ]; then
-        warning "$1 is unset or empty. Failed to append to the downloading list."
-        return 0
-    fi
-    # $2: url
-    url="$2"
-    # $3: filename
-    if [ -z "$3" ]; then
-        filename=$(basename "$url")
-    else
-        filename="$3"
-    fi
-    wget_paths+=("${downloads_dir}/${filename}")
-    wget_urls+=("$url")
+	# $1: flag
+	if [ -z "$(eval echo "\$$1")" ]; then
+		warning "$1 is unset or empty. Failed to append to the downloading list."
+		return 0
+	fi
+	# $2: url
+	url="$2"
+	# $3: filename
+	if [ -z "$3" ]; then
+		filename=$(basename "$url")
+	else
+		filename="$3"
+	fi
+	wget_paths+=("${downloads_dir}/${filename}")
+	wget_urls+=("$url")
 }
 _wget_all() {
-    for i in "${!wget_urls[@]}"; do
-        wget "${wget_urls[i]}" -q -c --show-progress -O "${wget_paths[i]}"
-    done
+	for i in "${!wget_urls[@]}"; do
+		wget "${wget_urls[i]}" -q -c --show-progress -O "${wget_paths[i]}"
+	done
 }
 _download_everything() {
-    # a wrapper of the function "wget_all"
-    if [ ${#wget_urls[@]} = 0 ]; then
-        debug "No download tasks."
-    else
-        debug "Check ${#wget_urls[@]} files:
+	# a wrapper of the function "wget_all"
+	if [ ${#wget_urls[@]} = 0 ]; then
+		debug "No download tasks."
+	else
+		debug "Check ${#wget_urls[@]} files:
 $(printf '%s\n' ${wget_urls[@]})"
-        _wget_all
-    fi
+		_wget_all
+	fi
 }
 
 if [ "${ENSURE_DOWNLOAD}" = true ]; then
-    downloads_dir="${script_dir}/downloads"
-    mkdir -p "${downloads_dir}"
+	downloads_dir="${script_dir}/downloads"
+	mkdir -p "${downloads_dir}"
 
-    _append_to_list CERES_VERSION "http://ceres-solver.org/ceres-solver-${CERES_VERSION}.tar.gz" ""
-    _append_to_list BOOST_VERSION "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_$(echo ${BOOST_VERSION} | sed 's/\./_/g').tar.gz" "boost-${BOOST_VERSION}.tar.gz"
-    _append_to_list FLANN_VERSION "https://github.com/flann-lib/flann/archive/refs/tags/${FLANN_VERSION}.tar.gz" "flann-${FLANN_VERSION}.tar.gz"
-    _append_to_list VTK_VERSION "https://www.vtk.org/files/release/$(echo ${VTK_VERSION} | cut -d '.' -f 1,2)/VTK-${VTK_VERSION}.tar.gz" "vtk-${VTK_VERSION}.tar.gz"
-    _append_to_list OPENCV_VERSION "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" "opencv-${OPENCV_VERSION}.tar.gz"
-    _append_to_list OPENCV_CONTRIB_VERSION "https://github.com/opencv/opencv_contrib/archive/refs/tags/${OPENCV_CONTRIB_VERSION}.tar.gz" "opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz"
-    # _append_to_list ROS2_DISTRO "https://github.com/ros2/ros2/releases/download/release-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}/ros2-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}-${OS}-${UBUNTU_DISTRO}-${ARCH}.tar.bz2" ""
-    # _append_to_list CARLA_VERSION "https://carla-releases.s3.eu-west-3.amazonaws.com/Linux/CARLA_${CARLA_VERSION}.tar.gz" ""
+	_append_to_list CERES_VERSION "http://ceres-solver.org/ceres-solver-${CERES_VERSION}.tar.gz" ""
+	_append_to_list BOOST_VERSION "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_$(echo ${BOOST_VERSION} | sed 's/\./_/g').tar.gz" "boost-${BOOST_VERSION}.tar.gz"
+	_append_to_list FLANN_VERSION "https://github.com/flann-lib/flann/archive/refs/tags/${FLANN_VERSION}.tar.gz" "flann-${FLANN_VERSION}.tar.gz"
+	_append_to_list VTK_VERSION "https://www.vtk.org/files/release/$(echo ${VTK_VERSION} | cut -d '.' -f 1,2)/VTK-${VTK_VERSION}.tar.gz" "vtk-${VTK_VERSION}.tar.gz"
+	_append_to_list OPENCV_VERSION "https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.tar.gz" "opencv-${OPENCV_VERSION}.tar.gz"
+	_append_to_list OPENCV_CONTRIB_VERSION "https://github.com/opencv/opencv_contrib/archive/refs/tags/${OPENCV_CONTRIB_VERSION}.tar.gz" "opencv_contrib-${OPENCV_CONTRIB_VERSION}.tar.gz"
+	# _append_to_list ROS2_DISTRO "https://github.com/ros2/ros2/releases/download/release-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}/ros2-${ROS2_DISTRO}-${ROS2_RELEASE_DATE}-${OS}-${UBUNTU_DISTRO}-${ARCH}.tar.bz2" ""
+	# _append_to_list CARLA_VERSION "https://carla-releases.s3.eu-west-3.amazonaws.com/Linux/CARLA_${CARLA_VERSION}.tar.gz" ""
 
-    _download_everything
+	_download_everything
 fi
 
-completed "Done."
+completed "Done! Try 'docker compose build'"
