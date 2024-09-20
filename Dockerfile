@@ -278,15 +278,14 @@ ARG NEOVIM_VERSION
 RUN if [ ! -z "${NEOVIM_VERSION}" ]; then \
     wget "https://github.com/neovim/neovim/releases/download/v${NEOVIM_VERSION}/nvim-linux64.tar.gz" -O nvim-linux64.tar.gz && \
     tar -xf nvim-linux64.tar.gz && \
-    export SOURCE_DIR=${PWD}/nvim-linux64 && export DEST_DIR=${XDG_PREFIX_HOME} && \
-    find ${SOURCE_DIR} -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \; && \
+    export SRC_DIR="${PWD}/nvim-linux64" && export DEST_DIR="${XDG_PREFIX_HOME}" && \
+    (cd ${SRC_DIR} && find . -type f -exec install -Dm 755 "{}" "${DEST_DIR}/{}" \;) && \
     rm -r nvim-linux64.tar.gz nvim-linux64 \
     ;else \
     sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
     neovim \
     && sudo rm -fr /var/lib/apt/lists/* \
     ;fi
-
 # Tmux
 ARG TMUX_GIT_REFERENCE
 RUN if [ ! -z "${TMUX_GIT_REFERENCE}" ]; then \

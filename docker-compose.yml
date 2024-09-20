@@ -31,6 +31,14 @@ services:
       target: robotics-devel
     command: zsh
     container_name: ${CONTAINER_NAME}
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - capabilities:
+            - gpu
+            count: all
+            driver: nvidia
     env_file: ./.env
     extra_hosts:
     - host.docker.internal:host-gateway
@@ -47,6 +55,7 @@ services:
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
     - /var/run/dbus:/var/run/dbus:rw
     - /run/user/${DOCKER_UID}:/run/user/${DOCKER_UID}:rw
+    - ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/tmp/${WAYLAND_DISPLAY}:rw
     - ~/.ssh:${DOCKER_HOME}/.ssh:rw
     - ~/Datasets:/home/${DOCKER_USER}/Datasets:rw
     - ~/Projects:/home/${DOCKER_USER}/Projects:rw

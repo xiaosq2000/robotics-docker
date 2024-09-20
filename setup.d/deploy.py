@@ -21,20 +21,21 @@ with open(compose_file, "r") as file:
 # Reference:
 # [1] https://docs.docker.com/compose/gpu-support/
 # [2] https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html
+print("For customization of docker compose deployment, you may edit", __file__)
 if run_with_nvidia:
-    print("Using all NVIDIA GPU Devices with full capabilities.")
-    print("For customization, you may edit", __file__)
+    print(f"Using all NVIDIA GPU Devices with GPU capabilities for service '{service_name}' in '{compose_file}'.")
     compose_data["services"][service_name]["deploy"] = {
         "resources": {
             "reservations": {
                 "devices": [
-                    {"capabilities": ["gpu", "tpu"], "count": "all", "driver": "nvidia"}
+                    {"capabilities": ["gpu"], "count": "all", "driver": "nvidia"}
                 ]
             }
         }
     }
 else:
     if "deploy" in compose_data["services"][service_name]:
+        print(f"Removing the 'deploy' section for service '{service_name}' in '{compose_file}'.")
         del compose_data["services"][service_name]["deploy"]
 
 with open(compose_file, "w") as file:
