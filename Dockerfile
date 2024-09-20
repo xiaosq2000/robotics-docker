@@ -345,6 +345,10 @@ RUN sudo mkdir -p /var/run/sshd && \
     sudo sed -i "s/^.*X11UseLocalhost.*$/X11UseLocalhost no/" /etc/ssh/sshd_config && \
     sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
+RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
+    msmtp \
+    && sudo rm -rf /var/lib/apt/lists/*
+
 ARG BOOST_VERSION
 COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}/install ${XDG_PREFIX_HOME}/boost-${BOOST_VERSION}
 ARG VTK_VERSION

@@ -56,7 +56,9 @@ services:
     - /var/run/dbus:/var/run/dbus:rw
     - /run/user/${DOCKER_UID}:/run/user/${DOCKER_UID}:rw
     - ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/tmp/${WAYLAND_DISPLAY}:rw
-    - ~/.ssh:${DOCKER_HOME}/.ssh:rw
     - ~/Datasets:/home/${DOCKER_USER}/Datasets:rw
     - ~/Projects:/home/${DOCKER_USER}/Projects:rw
     - ~/Documents:/home/${DOCKER_USER}/Documents:rw
+    # Todo: secrets
+    - ~/.ssh:${DOCKER_HOME}/.ssh:ro
+    - ~/.config/msmtp:${DOCKER_HOME}/.config/msmtp:ro
