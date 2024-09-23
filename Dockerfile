@@ -374,6 +374,7 @@ RUN cd ~ && \
 
 ENV TERM=xterm-256color
 SHELL ["/usr/bin/zsh", "-ic"]
+WORKDIR ${DOCKER_HOME}
 
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt
@@ -382,7 +383,29 @@ ENV HTTP_PROXY=
 ENV https_proxy=
 ENV HTTPS_PROXY=
 
-WORKDIR ${DOCKER_HOME}
+FROM robotics-devel as gsplat
+
+# Networking proxies
+ARG buildtime_http_proxy 
+ARG buildtime_https_proxy
+ENV http_proxy ${buildtime_http_proxy}
+ENV HTTP_PROXY ${buildtime_http_proxy}
+ENV https_proxy ${buildtime_https_proxy}
+ENV HTTPS_PROXY ${buildtime_https_proxy}
+
+# Avoid getting stuck with interactive interfaces when using apt-get
+ENV DEBIAN_FRONTEND noninteractive
+RUN micromamba create -y -n gsplat python=3.10 && \
+    micromamba activate gsplat && \
+    micromamba install -y cuda -c nvidia/label/cuda-12.4.0 && \
+    micromamba install -y pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia
+
+# Clear environment variables exclusively for building to prevent pollution.
+ENV DEBIAN_FRONTEND=newt
+ENV http_proxy=
+ENV HTTP_PROXY=
+ENV https_proxy=
+ENV HTTPS_PROXY=
 ################################################################################
 ################################### Archive ####################################
 ################################################################################

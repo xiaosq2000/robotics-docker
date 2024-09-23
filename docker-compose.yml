@@ -28,11 +28,14 @@ services:
       context: .
       dockerfile: Dockerfile
       network: ${BUILDTIME_NETWORK_MODE}
-      target: robotics-devel
+      target: ${BUILD_TARGET}
     command: zsh
     container_name: ${CONTAINER_NAME}
     deploy:
       resources:
+        limits:
+          cpus: ${CPU_LIMIT}
+          memory: ${MEMORY_LIMIT}
         reservations:
           devices:
           - capabilities:
@@ -55,10 +58,8 @@ services:
     - /tmp/.X11-unix:/tmp/.X11-unix:rw
     - /var/run/dbus:/var/run/dbus:rw
     - /run/user/${DOCKER_UID}:/run/user/${DOCKER_UID}:rw
-    - ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}:/tmp/${WAYLAND_DISPLAY}:rw
     - ~/Datasets:/home/${DOCKER_USER}/Datasets:rw
     - ~/Projects:/home/${DOCKER_USER}/Projects:rw
     - ~/Documents:/home/${DOCKER_USER}/Documents:rw
-    # Todo: secrets
     - ~/.ssh:${DOCKER_HOME}/.ssh:ro
     - ~/.config/msmtp:${DOCKER_HOME}/.config/msmtp:ro

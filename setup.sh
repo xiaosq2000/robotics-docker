@@ -46,7 +46,7 @@ display_help_messages() {
 		"${INDENT}Download specified build-time dependencies." \
 		"${INDENT}Generate 'docker-compose.yml' and '.env' for Docker build-time and run-time usage." \
 		"" \
-		"${INDENT}${BOLD}Before running, You could check out the environment variables written in $0.${RESET}" \
+		"${INDENT}${BOLD}Before running, You could check out the environment variables written in '$0'.${RESET}" \
 		"" \
 		"${INDENT}Recommended command for the first time," \
 		"" \
@@ -129,12 +129,14 @@ env_file=${script_dir}/.env
 cat /dev/null >${env_file}
 
 SERVICE_NAME="robotics"
+python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}" --clear
 compose_env=$(
 	cat <<-END
 
 		IMAGE_NAME=robotics
 		IMAGE_TAG=noble
 		CONTAINER_NAME=robotics-noble
+		BUILD_TARGET=gsplat
 
 	END
 )
@@ -162,7 +164,8 @@ build_env=$(
 		PCL_GIT_REFERENCE=aabe846
 		NEOVIM_VERSION=0.10.1
 		TMUX_GIT_REFERENCE=3.4
-		SETUP_TIMESTAMP=$(date +%N)
+		# SETUP_TIMESTAMP=$(date +%N)
+		SETUP_TIMESTAMP=0
 		# <<< as services.${SERVICE_NAME}.build.args
 
 	END
@@ -244,7 +247,7 @@ if [[ "$NVIDIA" == "true" ]]; then
 
 		END
 	)
-	python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}" --run-with-nvidia
+	python3 "$script_dir/setup.d/deploy.py" --service-name ${SERVICE_NAME} --nvidia
 else
 	container_runtime_env=$(
 		cat <<-END
@@ -253,7 +256,6 @@ else
 
 		END
 	)
-	python3 "$script_dir/setup.d/deploy.py" --service-name "${SERVICE_NAME}"
 fi
 if [[ "${WAYLAND}" == true ]]; then
 	display_runtime_env=$(
@@ -276,7 +278,14 @@ else
 		END
 	)
 fi
+resource_allocation_env=$(
+	cat <<-END
 
+		CPU_LIMIT="$(($(grep -c '^processor' /proc/cpuinfo) / 2))"
+		MEMORY_LIMIT="$(($(free -m | grep '^Mem' | awk '{ print $2; }') / 2))M"
+
+	END
+)
 echo "# ! The file is managed by '$(basename "$0")'." >>${env_file}
 echo "# ! Don't edit '${env_file}' manually. Change '$(basename "$0")' instead." >>${env_file}
 echo "${compose_env}" >>${env_file}
@@ -287,7 +296,10 @@ if [[ "${BUILD}" = true ]]; then
 	python3 "$script_dir/setup.d/build_args.py" "${SERVICE_NAME}"
 fi
 echo "${run_networking_env}" >>${env_file}
+
 echo "${container_runtime_env}" >>${env_file}
+echo "${resource_allocation_env}" >>${env_file}
+
 echo "${display_runtime_env}" >>${env_file}
 debug "Environment variables are saved to ${env_file}"
 
@@ -351,4 +363,4 @@ if [ "${ENSURE_DOWNLOAD}" = true ]; then
 	_download_everything
 fi
 
-completed "Done! Try 'docker compose build'"
+completed "Done!"
