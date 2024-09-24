@@ -217,7 +217,7 @@ ARG FLANN_VERSION
 COPY --chown=${DOCKER_USER}:${DOCKER_USER} --from=building_pcl_dependencies ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}/install ${XDG_PREFIX_HOME}/flann-${FLANN_VERSION}
 
 ARG PCL_GIT_REFERENCE
-RUN git clone --config http.proxy="${http_proxy}" --config https.proxy="${https_proxy}" --depth 1 https://github.com/PointCloudLibrary/pcl.git && \
+RUN git clone --config http.proxy="${http_proxy}" --config https.proxy="${https_proxy}" https://github.com/PointCloudLibrary/pcl.git && \
     cd pcl && \ 
     git checkout ${PCL_GIT_REFERENCE} && \
     cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=17 -DCMAKE_CUDA_STANDARD=17 -DBoost_NO_SYSTEM_PATHS=ON -DBOOST_ROOT=${XDG_PREFIX_HOME}/boost-${BOOST_VERSION} -DVTK_DIR=${XDG_PREFIX_HOME}/vtk-${VTK_VERSION} -DFLANN_ROOT=${XDG_PREFIX_HOME}/flann-${FLANN_VERSION} && \
@@ -346,7 +346,7 @@ RUN sudo mkdir -p /var/run/sshd && \
     sudo sed -i "s/^.*PermitUserEnvironment.*$/PermitUserEnvironment yes/" /etc/ssh/sshd_config
 
 RUN sudo apt-get update && sudo apt-get install -qy --no-install-recommends \
-    msmtp \
+    libnotify-bin msmtp \
     && sudo rm -rf /var/lib/apt/lists/*
 
 ARG BOOST_VERSION
@@ -392,13 +392,13 @@ ENV http_proxy ${buildtime_http_proxy}
 ENV HTTP_PROXY ${buildtime_http_proxy}
 ENV https_proxy ${buildtime_https_proxy}
 ENV HTTPS_PROXY ${buildtime_https_proxy}
-
 # Avoid getting stuck with interactive interfaces when using apt-get
 ENV DEBIAN_FRONTEND noninteractive
-RUN micromamba create -y -n gsplat python=3.10 && \
-    micromamba activate gsplat && \
-    micromamba install -y cuda -c nvidia/label/cuda-12.4.0 && \
-    micromamba install -y pytorch torchvision torchaudio pytorch-cuda=12.4 -c pytorch -c nvidia
+
+# Robostack: ROS1 Noetic
+RUN micromamba create -y -n ros_env -c conda-forge -c robostack-staging ros-noetic-desktop python=3.11
+# 3D Gaussian Splatting
+RUN micromamba create -y -n gsplat -c nvidia/label/cuda-12.4.0 -c pytorch -c nvidia python=3.11 cuda pytorch=2.4.1 torchvision=0.19 pytorch-cuda=12.4
 
 # Clear environment variables exclusively for building to prevent pollution.
 ENV DEBIAN_FRONTEND=newt

@@ -55,11 +55,11 @@ services:
     tty: true
     user: ${DOCKER_UID}:${DOCKER_GID}
     volumes:
-    - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    - /var/run/dbus:/var/run/dbus:rw
-    - /run/user/${DOCKER_UID}:/run/user/${DOCKER_UID}:rw
-    - ~/Datasets:/home/${DOCKER_USER}/Datasets:rw
-    - ~/Projects:/home/${DOCKER_USER}/Projects:rw
-    - ~/Documents:/home/${DOCKER_USER}/Documents:rw
+    - ~/Datasets:${DOCKER_HOME}/Datasets:rw
+    - ~/Projects:${DOCKER_HOME}/Projects:rw
+    - ~/Documents:${DOCKER_HOME}/Documents:rw
     - ~/.ssh:${DOCKER_HOME}/.ssh:ro
     - ~/.config/msmtp:${DOCKER_HOME}/.config/msmtp:ro
+    - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    - $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/tmp/$WAYLAND_DISPLAY:rw
+    - /run/user/1000/bus:/run/user/1000/bus:rw

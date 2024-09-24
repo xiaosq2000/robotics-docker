@@ -21,7 +21,7 @@ info() {
 }
 debug() {
 	set +u
-	if [[ "$DEBUG" == "true" ]]; then
+	if [[ "$VERBOSE" == "true" ]]; then
 		set -u
 		printf '%s\n' "${BOLD}${GREY}DEBUG:${RESET} $*"
 	fi
@@ -69,7 +69,7 @@ display_help_messages() {
 		"${INDENT}                       If not given, X11 run-time environment variables will be configured." \
 		"" \
 		"${INDENT}-h, --help             Display help messages." \
-		"${INDENT}--debug                Display verbose logging for debugging." \
+		"${INDENT}--verbose              Display verbose logging for debugging." \
 		""
 }
 
@@ -81,8 +81,8 @@ while [[ $# -gt 0 ]]; do
 		display_help_messages
 		exit 0
 		;;
-	--debug)
-		DEBUG=true
+	--verbose)
+		VERBOSE=true
 		shift
 		;;
 	-b | --build)
@@ -161,7 +161,7 @@ build_env=$(
 		BOOST_VERSION=1.86.0
 		FLANN_VERSION=1.9.2
 		VTK_VERSION=9.3.1
-		PCL_GIT_REFERENCE=aabe846
+		PCL_GIT_REFERENCE=d1c34a8
 		NEOVIM_VERSION=0.10.1
 		TMUX_GIT_REFERENCE=3.4
 		# SETUP_TIMESTAMP=$(date +%N)
@@ -193,9 +193,8 @@ else
 		END
 	)
 fi
-debug "Following build-time networking environment variables are used.
-$build_networking_env
-"
+debug "$build_networking_env"
+
 if [[ "$RUN_PROXY" == "true" ]]; then
 	run_networking_env=$(
 		cat <<-END
@@ -222,9 +221,8 @@ else
 		END
 	)
 fi
-debug "Following runtime networking environment variables are used.
-$run_networking_env
-"
+debug "$run_networking_env"
+
 run_and_build_user_env=$(
 	cat <<-END
 
@@ -262,21 +260,30 @@ if [[ "${WAYLAND}" == true ]]; then
 		cat <<-END
 
 			DISPLAY=${DISPLAY}
+			DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"
 			WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
-			SDL_VIDEODRIVER=wayland
 			QT_QPA_PLATFORM=wayland
+			GDK_BACKEND=wayland
+			CLUTTER_BACKEND=wayland
+			SDL_VIDEODRIVER=wayland
+			ELM_DISPLAY=wl
+			ELM_ACCEL=opengl
+			ECORE_EVAS_ENGINE=wayland_egl
 
 		END
 	)
+	debug "Using Wayland and Xwayland."
+	python3 "$script_dir/setup.d/volumes.py" --service-name "${SERVICE_NAME}" --wayland --x11 --dbus
 else
 	display_runtime_env=$(
 		cat <<-END
 
 			DISPLAY=${DISPLAY}
-			SDL_VIDEODRIVER=x11
+			DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"
 
 		END
 	)
+	python3 "$script_dir/setup.d/volumes.py" --service-name "${SERVICE_NAME}" --x11 --dbus
 fi
 resource_allocation_env=$(
 	cat <<-END
@@ -287,7 +294,7 @@ resource_allocation_env=$(
 	END
 )
 echo "# ! The file is managed by '$(basename "$0")'." >>${env_file}
-echo "# ! Don't edit '${env_file}' manually. Change '$(basename "$0")' instead." >>${env_file}
+echo "# ! Don't edit it manually. Change '$(basename "$0")' instead." >>${env_file}
 echo "${compose_env}" >>${env_file}
 echo "${run_and_build_user_env}" >>${env_file}
 if [[ "${BUILD}" = true ]]; then
@@ -302,6 +309,9 @@ echo "${resource_allocation_env}" >>${env_file}
 
 echo "${display_runtime_env}" >>${env_file}
 debug "Environment variables are saved to ${env_file}"
+debug "
+$(cat ${env_file})
+"
 
 # Load varibles from a file
 # Reference: https://stackoverflow.com/a/30969768
